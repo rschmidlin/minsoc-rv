@@ -1,0 +1,96 @@
+CAPI=2:
+
+name: ::minsoc-rv:0.1
+description: "Minimal System-on-Chip RISC-V"
+
+filesets:
+  soc_files:
+    files:
+      - rtl/verilog/minsoc_rv_top.v
+    file_type: verilogSource
+    depend:
+      - "picorv32"
+      - ">=uart16550-1.5.4"
+      - ">=wb_ram-1.0"
+  verilog_tb_files:
+    files:
+      - bench/verilog/minsoc_rv_tb.v: {file_type: verilogSource}
+    depend:
+      - ">=elf-loader-1.0.3"
+      - ">=jtag_vpi-r2"
+      - ">=vlog_tb_utils-1.0"
+  wb_intercon_dep:
+    depend: 
+      - ~wb_intercon-1.2
+
+targets:
+  default: &default
+    default_tool: icarus
+    filesets:
+      - soc_files
+      - wb_intercon_dep
+    toplevel: minsoc_rv_top
+    generate:
+      - wb_intercon
+    #parameters:
+    #  - clk_freq_hz
+
+  sim:
+    <<: *default
+    description: Simulate the design
+    default_tool: icarus
+    filesets_append:
+      - verilog_tb_files
+    toplevel: minsoc_rv_tb
+    parameters:
+      - elf_load
+      - clear_ram
+      - timeout
+      - vcd
+    tools:
+      icarus:
+        iverilog_options:
+          - -g2012
+
+parameters:
+  elf_load:
+    datatype   : file
+    description: ELF file to preload into RAM
+    paramtype  : plusarg
+    scope      : private
+
+  clear_ram:
+    datatype   : bool
+    description: Preset RAM to a known value (0)
+    paramtype  : plusarg
+    scope      : private
+
+  timeout:
+    datatype   : int
+    description: Abort the simulation after this many time units
+    paramtype  : plusarg
+    scope      : private
+
+  vcd:
+    datatype   : bool
+    description: Enable VCD waveform dumping
+    paramtype  : plusarg
+    scope      : private
+
+generate:
+  wb_intercon:
+    generator : wb_intercon_gen
+    parameters:
+      masters:
+        picorv32:
+          slaves:
+            - mem
+            - uart
+      slaves:
+        mem:
+          offset : 0
+          size : 0x2000000
+        uart:
+          offset : 0x90000000
+          size : 0x20
+  
