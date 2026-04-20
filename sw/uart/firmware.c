@@ -134,7 +134,8 @@ static void uart_print_str(const char *s)
 int main(void)
 {
     uart_init();
-    uart_print_str("Hello World.\n");
+    uart_print_str("Hello World.");
+    uart_putc('\n');
 
     /* Spin forever */
     while (1)

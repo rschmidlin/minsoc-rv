@@ -56,6 +56,7 @@ module minsoc_rv_tb;
    reg new_line;
    reg new_char;
    reg flush_line;
+   reg [12*8-1:0] hello;
 
    initial begin
       new_line = 1'b0;
@@ -76,7 +77,7 @@ module minsoc_rv_tb;
 
          // Wait for start bit
          while (uart_stx == 1'b1)
-            @(uart_stx);
+         @(uart_stx);
 
          #(UART_TX_WAIT + (UART_TX_WAIT/2));
 
@@ -105,6 +106,41 @@ module minsoc_rv_tb;
             line = {line[39*8-1:0], tx_byte};
             new_char = 1'b1;
          end
+      end
+   endtask
+
+   initial begin
+      //
+      // Testbench START
+      //
+      $display("Running simulation: if you want to stop it, type ctrl+c and type in finish afterwards.");
+      $display("Testing UART firmware, this takes a while (~1 min. @ 2.53 GHz dual-core)...");
+      test_uart();
+      $display("Stopping simulation.");
+      $finish;
+   end
+
+   task test_uart;
+      begin
+         @ (posedge new_line);
+         $display("UART data received.");
+         hello = line[12*8-1:0];
+         /*
+         //sending character A to UART, B expected
+         $display("Testing UART interrupt..."); 
+         uart_echo = 1'b0;
+         uart_send(8'h41);       //Character A
+         @ (posedge new_char);
+         if ( line[7:0] == "B" )
+            $display("UART interrupt working.");
+         else
+            $display("UART interrupt failed. B was expected, %c was received.", line[7:0]);
+         uart_echo = 1'b1;*/
+
+         if ( hello == "Hello World." )
+            $display("UART firmware test completed, behaving correctly.");
+         else
+            $display("UART firmware test completed, failed.");
       end
    endtask
 
