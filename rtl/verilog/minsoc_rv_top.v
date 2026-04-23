@@ -1,6 +1,5 @@
 module minsoc_rv_top
   #(parameter MEM_SIZE = 32'h02000000
-  #(parameter IBEX = 1'b1
    )
 (
 		input wb_clk_i,
@@ -115,7 +114,7 @@ uart_top #(
    assign wb_s2m_uart_err = 1'b0;
    assign wb_s2m_uart_rty = 1'b0;
 
-    generate if (IBEX == 1) begin 
+
 ////////////////////////////////////////////////////////////////////////
 //
 // PicoRV32 RISC-V Core with Wishbone Interface
@@ -127,7 +126,7 @@ picorv32_wb #(
     .ENABLE_COUNTERS64    ( 1 ),
     .ENABLE_REGS_16_31    ( 1 ),
     .ENABLE_REGS_DUALPORT ( 1 ),
-//    .LATCHED_MEM_RDATA    ( 0 ),
+    .LATCHED_MEM_RDATA    ( 0 ),
     .TWO_STAGE_SHIFT      ( 1 ),
     .BARREL_SHIFTER       ( 0 ),
     .TWO_CYCLE_COMPARE    ( 0 ),
@@ -174,11 +173,5 @@ picorv32_wb #(
 // and wb_ram accept the transactions.
 assign wb_m2s_picorv32_cti = 3'b000;
 assign wb_m2s_picorv32_bte = 2'b00;
-    end // if (IBEX == 1)
-    else begin
-    ibex_top #()
-    u_ibex
-    end
-    endgenerate
 
 endmodule
