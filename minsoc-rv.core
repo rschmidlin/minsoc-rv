@@ -7,9 +7,11 @@ filesets:
   soc_files:
     files:
       - rtl/verilog/minsoc_rv_top.v
+      - rtl/verilog/wb_backend.v
+      - rtl/verilog/ibex_wb.v
     file_type: verilogSource
     depend:
-      - "picorv32"
+      - "lowrisc:ibex:ibex_top"
       - ">=uart16550-1.5.4"
       - ">=wb_ram-1.0"
   verilog_tb_files:
@@ -82,7 +84,10 @@ generate:
     generator : wb_intercon_gen
     parameters:
       masters:
-        picorv32:
+        ibexi:
+          slaves:
+            - mem
+        ibexd:
           slaves:
             - mem
             - uart

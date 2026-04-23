@@ -7,6 +7,13 @@
  * converted to Wishbone B4 interfaces.
  */
 
+`ifdef RISCV_FORMAL
+  `define RVFI
+`endif
+
+
+`include "prim_assert.sv"
+
 module ibex_wb #(
 	// Ibex Parameters
 	parameter bit          PMPEnable        = 1'b0,
@@ -14,6 +21,9 @@ module ibex_wb #(
 	parameter int unsigned PMPNumRegions    = 4,
 	parameter int unsigned MHPMCounterNum   = 0,
 	parameter int unsigned MHPMCounterWidth = 40,
+   parameter ibex_pkg::pmp_cfg_t     PMPRstCfg[PMP_MAX_REGIONS]   = ibex_pkg::PmpCfgRst,
+   parameter logic [PMP_ADDR_MSB:0]  PMPRstAddr[PMP_MAX_REGIONS]  = ibex_pkg::PmpAddrRst,
+   parameter ibex_pkg::pmp_mseccfg_t PMPRstMsecCfg                = ibex_pkg::PmpMseccfgRst,
 	parameter bit          RV32E            = 1'b0,
 	parameter bit          RV32M            = 1'b1,
 	parameter bit          RV32B            = 1'b0,
@@ -125,6 +135,9 @@ module ibex_wb #(
 		.PMPNumRegions(PMPNumRegions),
 		.MHPMCounterNum(MHPMCounterNum),
 		.MHPMCounterWidth(MHPMCounterWidth),
+      .PMPRstCfg[P_MAX_REGIONS](ibex_pkg::PmpCfgRst),
+      .PMPRstAddr[P_MAX_REGIONS](ibex_pkg::PmpAddrRst),
+      .PMPRstMsecCfg(ibex_pkg::PmpMseccfgRst),
 		.RV32E(RV32E),
 		.RV32M(RV32M),
 		.RV32B(RV32B),

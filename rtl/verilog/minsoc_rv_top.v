@@ -115,7 +115,7 @@ uart_top #(
    assign wb_s2m_uart_err = 1'b0;
    assign wb_s2m_uart_rty = 1'b0;
 
-    generate if (IBEX == 1) begin 
+    generate if (IBEX == 1'b0) begin 
 ////////////////////////////////////////////////////////////////////////
 //
 // PicoRV32 RISC-V Core with Wishbone Interface
@@ -176,8 +176,110 @@ assign wb_m2s_picorv32_cti = 3'b000;
 assign wb_m2s_picorv32_bte = 2'b00;
     end // if (IBEX == 1)
     else begin
-    ibex_top #()
-    u_ibex
+
+    wire irq_software_i, irq_timer_i, irq_external_i, irq_nm_i;
+    wire [14:0] irq_fast_i;
+
+    wire debug_req_i;
+    wire [63:0] crash_dump_o;
+
+    wire fetch_enable_i, alert_minor_o, alert_major_internal_o, alert_major_bus_o, core_sleep_o;
+
+    assign irq_software_i = 1'b0;
+    assign irq_timer_i = 1'b0;
+    assign irq_external_i = 1'b0;
+    assign irq_nm_i = 1'b0;
+    assign irq_fast_i = 15'h0000;
+
+    assign debug_req_i = 1'b0;
+
+    assign fetch_enable_i = 1'b0;
+    
+    ibex_wb #(
+      .PMPEnable                    (1'b0),
+      .PMPGranularity               (0),
+      .PMPNumRegions                (4),
+      .MHPMCounterNum               (0),
+      .MHPMCounterWidth             (40),
+      .PMPRstCfg[P_MAX_REGIONS]     (ibex_pkg::PmpCfgRst),
+      .PMPRstAddr[P_MAX_REGIONS]    (ibex_pkg::PmpAddrRst),
+      .PMPRstMsecCfg                (ibex_pkg::PmpMseccfgRst),
+      .RV32E                        (1'b0),
+      .RV32M                        (RV32MFast),
+      .RV32B                        (RV32BNone),
+      .RV32ZC                       (RV32ZcaZcbZcmp),
+      .RegFile                      (RegFileFF),
+      .BranchTargetALU              (1'b0),
+      .WritebackStage               (1'b0),
+      .ICache                       (1'b0),
+      .ICacheECC                    (1'b0),
+      .BranchPredictor              (1'b0),
+      .DbgTriggerEn                 (1'b0),
+      .DbgHwBreakNum                (1),
+      .SecureIbex                   (1'b0),
+      .LockstepOffset               (1),
+      .MemECC                       (SecureIbex),
+      .MemDataWidth                 (MemECC ? 32 + 7 : 32),
+      .ICacheScramble               (1'b0),
+      .ICacheScrNumPrinceRoundsHalf (2),
+      .ICacheTweakInfection         (SecureIbex),
+      .RndCnstLfsrSeed              (RndCnstLfsrSeedDefault),
+      .RndCnstLfsrPerm              (RndCnstLfsrPermDefault),
+      .DmBaseAddr                   (32'h1A110000),
+      .DmAddrMask                   (32'h00000FFF),
+      .DmHaltAddr                   (32'h1A110800),
+      .DmExceptionAddr              (32'h1A110808),
+      .RndCnstIbexKey               (RndCnstIbexKeyDefault),
+      .RndCnstIbexNonce             (RndCnstIbexNonceDefault),
+      .CsrMvendorId                 (32'b0),
+      .CsrMimpId                    (32'b0)
+)
+    u_ibex (
+            .clk_i(wb_clk),
+            .rst_ni(wb_rst),
+
+	// Wishbone Instruction Memory Interface
+            .instr_wb_cyc(wb_m2s_ibexi_cyc),
+            .instr_wb_stb(wb_m2s_ibexi_stb),
+            .instr_wb_we(wb_m2s_ibexi_we),
+            .instr_wb_adr(wb_m2s_ibexi_adr),
+            .instr_wb_dat_w(wb_m2s_ibexi_dat_w),
+            .instr_wb_ack(wb_s2m_ibexi_ack),
+            .instr_wb_dat_r(wb_s2m_ibexi_dat_r),
+            .instr_wb_err(wb_s2m_ibexi_err),
+
+	// Wishbone Data Memory Interface
+            .data_wb_cyc(wb_m2s_ibexd_cyc),
+            .data_wb_stb(wb_m2s_ibexd_stb),
+            .data_wb_we(wb_m2s_ibexd_we),
+            .data_wb_adr(wb_m2s_ibexd_adr),
+            .data_wb_dat_w(wb_m2s_ibexd_dat_w),
+            .data_wb_ack(wb_s2m_ibexd_ack),
+            .data_wb_dat_r(wb_s2m_ibexd_dat_r),
+            .data_wb_err(wb_s2m_ibexd_err),
+
+	// Configuration
+            .hart_id_i(hart_id_i),
+            .boot_addr_i(boot_addr_i),
+
+	// Interrupt inputs
+            .irq_software_i(irq_software_i),
+            .irq_timer_i(irq_timer_i),
+            .irq_external_i(irq_external_i),
+            .irq_fast_i(irq_fast_i),
+            .irq_nm_i(irq_nm_i),
+
+	// Debug interface (optional)
+            .debug_req_i(debug_req_i),
+            .crash_dump_o(crash_dump_o),
+
+	// Control signals
+            .fetch_enable_i(fetch_enable_i),
+            .alert_minor_o(alert_minor_o),
+            .alert_major_internal_o(alert_major_internal_o),
+            .alert_major_bus_o(alert_major_bus_o),
+            .core_sleep_o(core_sleep_o)
+            );
     end
     endgenerate
 
