@@ -126,7 +126,7 @@ picorv32_wb #(
     .ENABLE_COUNTERS64    ( 1 ),
     .ENABLE_REGS_16_31    ( 1 ),
     .ENABLE_REGS_DUALPORT ( 1 ),
-    .LATCHED_MEM_RDATA    ( 0 ),
+    //.LATCHED_MEM_RDATA    ( 0 ),
     .TWO_STAGE_SHIFT      ( 1 ),
     .BARREL_SHIFTER       ( 0 ),
     .TWO_CYCLE_COMPARE    ( 0 ),
