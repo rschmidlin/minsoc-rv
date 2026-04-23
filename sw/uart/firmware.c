@@ -135,6 +135,8 @@ int main(void)
 {
     uart_init();
     uart_print_str("Hello World.");
+    
+    // The linefeed was not being printed initially, also PicoRV32 was not sending it to UART
     uart_putc('\n');
 
     /* Spin forever */
