@@ -163,9 +163,25 @@ picorv32_wb #(
     .wbm_ack_i(wb_s2m_picorv32_ack),
     .wbm_dat_i(wb_s2m_picorv32_dat),
 
-    // IRQ Interface (tied off for now)
-    .irq(32'h0),
-    .eoi()
+	// Pico Co-Processor Interface (PCPI)
+	.pcpi_valid(),
+	.pcpi_insn(),
+	.pcpi_rs1(),
+	.pcpi_rs2(),
+	.pcpi_wr(1'b0),
+	.pcpi_rd(32'h0000_0000),
+	.pcpi_wait(1'b0),
+	.pcpi_ready(1'b0),
+   
+   // IRQ Interface (tied off for now)
+   .irq(32'h0),
+   .eoi(),
+   
+	// Trace Interface
+	.trace_valid(),
+	.trace_data(),
+   
+	.mem_instr()
 );
 
 // PicoRV32 does not drive Wishbone B3 cycle type signals;
