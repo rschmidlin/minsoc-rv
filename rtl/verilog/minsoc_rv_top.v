@@ -199,7 +199,8 @@ uart_top #(
     wire debug_req_i;
     wire [63:0] crash_dump_o;
 
-    wire fetch_enable_i, alert_minor_o, alert_major_internal_o, alert_major_bus_o, core_sleep_o;
+    wire alert_minor_o, alert_major_internal_o, alert_major_bus_o, core_sleep_o;
+    wire [3:0] fetch_enable_i;
 
     assign irq_software_i = 1'b0;
     assign irq_timer_i = 1'b0;
@@ -209,7 +210,7 @@ uart_top #(
 
     assign debug_req_i = 1'b0;
 
-    assign fetch_enable_i = 1'b0;
+    assign fetch_enable_i = 4'b0101;
     
     ibex_wb #(
         .PMPEnable(1'b0),
@@ -218,7 +219,7 @@ uart_top #(
 )
     u_ibex (
             .clk_i(wb_clk),
-            .rst_ni(wb_rst),
+            .rst_ni(~wb_rst),
 
 	// Wishbone Instruction Memory Interface
             .instr_wb_cyc(wb_m2s_ibexi_cyc),
