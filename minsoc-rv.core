@@ -8,7 +8,7 @@ filesets:
     files:
       - rtl/verilog/minsoc_rv_top.v
       - rtl/verilog/wb_backend.v
-      - rtl/verilog/ibex_wb.v
+      - rtl/verilog/ibex_wb.sv
     file_type: verilogSource
     depend:
       - "lowrisc:ibex:ibex_top"

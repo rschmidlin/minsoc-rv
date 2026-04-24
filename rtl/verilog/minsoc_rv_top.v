@@ -1,5 +1,6 @@
 module minsoc_rv_top
-  #(parameter MEM_SIZE = 32'h02000000
+  #(parameter MEM_SIZE = 32'h02000000,
+    parameter IBEX = 1'b1
    )
 (
 		input wb_clk_i,
@@ -115,81 +116,81 @@ uart_top #(
    assign wb_s2m_uart_rty = 1'b0;
 
     generate if (IBEX == 1'b0) begin 
-////////////////////////////////////////////////////////////////////////
-//
-// PicoRV32 RISC-V Core with Wishbone Interface
-//
-////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////
+        //
+        // PicoRV32 RISC-V Core with Wishbone Interface
+        //
+        ////////////////////////////////////////////////////////////////////////
 
-picorv32_wb #(
-    .ENABLE_COUNTERS      ( 1 ),
-    .ENABLE_COUNTERS64    ( 1 ),
-    .ENABLE_REGS_16_31    ( 1 ),
-    .ENABLE_REGS_DUALPORT ( 1 ),
-    //.LATCHED_MEM_RDATA    ( 0 ),
-    .TWO_STAGE_SHIFT      ( 1 ),
-    .BARREL_SHIFTER       ( 0 ),
-    .TWO_CYCLE_COMPARE    ( 0 ),
-    .TWO_CYCLE_ALU        ( 0 ),
-    .COMPRESSED_ISA       ( 0 ),
-    .CATCH_MISALIGN       ( 1 ),
-    .CATCH_ILLINSN        ( 1 ),
-    .ENABLE_PCPI          ( 0 ),
-    .ENABLE_MUL           ( 0 ),
-    .ENABLE_FAST_MUL      ( 0 ),
-    .ENABLE_DIV           ( 0 ),
-    .ENABLE_IRQ           ( 1 ),
-    .ENABLE_IRQ_QREGS     ( 1 ),
-    .ENABLE_IRQ_TIMER     ( 1 ),
-    .ENABLE_TRACE         ( 0 ),
-    .REGS_INIT_ZERO       ( 0 ),
-    .MASKED_IRQ           ( 32'h0000_0000 ),
-    .LATCHED_IRQ          ( 32'hffff_ffff ),
-    .PROGADDR_RESET       ( 32'h0000_0000 ),
-    .PROGADDR_IRQ         ( 32'h0000_0010 ),
-    .STACKADDR            ( 32'hffff_ffff )
-) u_picorv32_wb (
-    .wb_clk_i(wb_clk),
-    .wb_rst_i(wb_rst),
-    .trap(),
+        picorv32_wb #(
+            .ENABLE_COUNTERS      ( 1 ),
+            .ENABLE_COUNTERS64    ( 1 ),
+            .ENABLE_REGS_16_31    ( 1 ),
+            .ENABLE_REGS_DUALPORT ( 1 ),
+            //.LATCHED_MEM_RDATA    ( 0 ),
+            .TWO_STAGE_SHIFT      ( 1 ),
+            .BARREL_SHIFTER       ( 0 ),
+            .TWO_CYCLE_COMPARE    ( 0 ),
+            .TWO_CYCLE_ALU        ( 0 ),
+            .COMPRESSED_ISA       ( 0 ),
+            .CATCH_MISALIGN       ( 1 ),
+            .CATCH_ILLINSN        ( 1 ),
+            .ENABLE_PCPI          ( 0 ),
+            .ENABLE_MUL           ( 0 ),
+            .ENABLE_FAST_MUL      ( 0 ),
+            .ENABLE_DIV           ( 0 ),
+            .ENABLE_IRQ           ( 1 ),
+            .ENABLE_IRQ_QREGS     ( 1 ),
+            .ENABLE_IRQ_TIMER     ( 1 ),
+            .ENABLE_TRACE         ( 0 ),
+            .REGS_INIT_ZERO       ( 0 ),
+            .MASKED_IRQ           ( 32'h0000_0000 ),
+            .LATCHED_IRQ          ( 32'hffff_ffff ),
+            .PROGADDR_RESET       ( 32'h0000_0000 ),
+            .PROGADDR_IRQ         ( 32'h0000_0010 ),
+            .STACKADDR            ( 32'hffff_ffff )
+        ) u_picorv32_wb (
+            .wb_clk_i(wb_clk),
+            .wb_rst_i(wb_rst),
+            .trap(),
 
-    // Wishbone Master Interface - routed to memory interconnect
-    .wbm_cyc_o(wb_m2s_picorv32_cyc),
-    .wbm_stb_o(wb_m2s_picorv32_stb),
-    .wbm_we_o(wb_m2s_picorv32_we),
-    .wbm_adr_o(wb_m2s_picorv32_adr),
-    .wbm_dat_o(wb_m2s_picorv32_dat),
-    .wbm_sel_o(wb_m2s_picorv32_sel),
-    .wbm_ack_i(wb_s2m_picorv32_ack),
-    .wbm_dat_i(wb_s2m_picorv32_dat),
+            // Wishbone Master Interface - routed to memory interconnect
+            .wbm_cyc_o(wb_m2s_picorv32_cyc),
+            .wbm_stb_o(wb_m2s_picorv32_stb),
+            .wbm_we_o(wb_m2s_picorv32_we),
+            .wbm_adr_o(wb_m2s_picorv32_adr),
+            .wbm_dat_o(wb_m2s_picorv32_dat),
+            .wbm_sel_o(wb_m2s_picorv32_sel),
+            .wbm_ack_i(wb_s2m_picorv32_ack),
+            .wbm_dat_i(wb_s2m_picorv32_dat),
 
-	// Pico Co-Processor Interface (PCPI)
-	.pcpi_valid(),
-	.pcpi_insn(),
-	.pcpi_rs1(),
-	.pcpi_rs2(),
-	.pcpi_wr(1'b0),
-	.pcpi_rd(32'h0000_0000),
-	.pcpi_wait(1'b0),
-	.pcpi_ready(1'b0),
-   
-   // IRQ Interface (tied off for now)
-   .irq(32'h0),
-   .eoi(),
-   
-	// Trace Interface
-	.trace_valid(),
-	.trace_data(),
-   
-	.mem_instr()
-);
+            // Pico Co-Processor Interface (PCPI)
+            .pcpi_valid(),
+            .pcpi_insn(),
+            .pcpi_rs1(),
+            .pcpi_rs2(),
+            .pcpi_wr(1'b0),
+            .pcpi_rd(32'h0000_0000),
+            .pcpi_wait(1'b0),
+            .pcpi_ready(1'b0),
+        
+        // IRQ Interface (tied off for now)
+        .irq(32'h0),
+        .eoi(),
+        
+            // Trace Interface
+            .trace_valid(),
+            .trace_data(),
+        
+            .mem_instr()
+        );
 
-// PicoRV32 does not drive Wishbone B3 cycle type signals;
-// tie to classic cycle (cti=000, bte=00) so the interconnect
-// and wb_ram accept the transactions.
-assign wb_m2s_picorv32_cti = 3'b000;
-assign wb_m2s_picorv32_bte = 2'b00;
-    end // if (IBEX == 1)
+        // PicoRV32 does not drive Wishbone B3 cycle type signals;
+        // tie to classic cycle (cti=000, bte=00) so the interconnect
+        // and wb_ram accept the transactions.
+        assign wb_m2s_picorv32_cti = 3'b000;
+        assign wb_m2s_picorv32_bte = 2'b00;
+    end // if (IBEX == 1'b0)
     else begin
 
     wire irq_software_i, irq_timer_i, irq_external_i, irq_nm_i;
@@ -211,43 +212,9 @@ assign wb_m2s_picorv32_bte = 2'b00;
     assign fetch_enable_i = 1'b0;
     
     ibex_wb #(
-      .PMPEnable                    (1'b0),
-      .PMPGranularity               (0),
-      .PMPNumRegions                (4),
-      .MHPMCounterNum               (0),
-      .MHPMCounterWidth             (40),
-      .PMPRstCfg[P_MAX_REGIONS]     (ibex_pkg::PmpCfgRst),
-      .PMPRstAddr[P_MAX_REGIONS]    (ibex_pkg::PmpAddrRst),
-      .PMPRstMsecCfg                (ibex_pkg::PmpMseccfgRst),
-      .RV32E                        (1'b0),
-      .RV32M                        (RV32MFast),
-      .RV32B                        (RV32BNone),
-      .RV32ZC                       (RV32ZcaZcbZcmp),
-      .RegFile                      (RegFileFF),
-      .BranchTargetALU              (1'b0),
-      .WritebackStage               (1'b0),
-      .ICache                       (1'b0),
-      .ICacheECC                    (1'b0),
-      .BranchPredictor              (1'b0),
-      .DbgTriggerEn                 (1'b0),
-      .DbgHwBreakNum                (1),
-      .SecureIbex                   (1'b0),
-      .LockstepOffset               (1),
-      .MemECC                       (SecureIbex),
-      .MemDataWidth                 (MemECC ? 32 + 7 : 32),
-      .ICacheScramble               (1'b0),
-      .ICacheScrNumPrinceRoundsHalf (2),
-      .ICacheTweakInfection         (SecureIbex),
-      .RndCnstLfsrSeed              (RndCnstLfsrSeedDefault),
-      .RndCnstLfsrPerm              (RndCnstLfsrPermDefault),
-      .DmBaseAddr                   (32'h1A110000),
-      .DmAddrMask                   (32'h00000FFF),
-      .DmHaltAddr                   (32'h1A110800),
-      .DmExceptionAddr              (32'h1A110808),
-      .RndCnstIbexKey               (RndCnstIbexKeyDefault),
-      .RndCnstIbexNonce             (RndCnstIbexNonceDefault),
-      .CsrMvendorId                 (32'b0),
-      .CsrMimpId                    (32'b0)
+        .PMPEnable(1'b0),
+        .PMPGranularity(0),
+        .PMPNumRegions(4)
 )
     u_ibex (
             .clk_i(wb_clk),
@@ -258,9 +225,9 @@ assign wb_m2s_picorv32_bte = 2'b00;
             .instr_wb_stb(wb_m2s_ibexi_stb),
             .instr_wb_we(wb_m2s_ibexi_we),
             .instr_wb_adr(wb_m2s_ibexi_adr),
-            .instr_wb_dat_w(wb_m2s_ibexi_dat_w),
+            .instr_wb_dat_w(wb_m2s_ibexi_dat),
             .instr_wb_ack(wb_s2m_ibexi_ack),
-            .instr_wb_dat_r(wb_s2m_ibexi_dat_r),
+            .instr_wb_dat_r(wb_s2m_ibexi_dat),
             .instr_wb_err(wb_s2m_ibexi_err),
 
 	// Wishbone Data Memory Interface
@@ -268,14 +235,14 @@ assign wb_m2s_picorv32_bte = 2'b00;
             .data_wb_stb(wb_m2s_ibexd_stb),
             .data_wb_we(wb_m2s_ibexd_we),
             .data_wb_adr(wb_m2s_ibexd_adr),
-            .data_wb_dat_w(wb_m2s_ibexd_dat_w),
+            .data_wb_dat_w(wb_m2s_ibexd_dat),
             .data_wb_ack(wb_s2m_ibexd_ack),
-            .data_wb_dat_r(wb_s2m_ibexd_dat_r),
+            .data_wb_dat_r(wb_s2m_ibexd_dat),
             .data_wb_err(wb_s2m_ibexd_err),
 
 	// Configuration
-            .hart_id_i(hart_id_i),
-            .boot_addr_i(boot_addr_i),
+            .hart_id_i(32'hdeadbeef),
+            .boot_addr_i(32'h00000000),
 
 	// Interrupt inputs
             .irq_software_i(irq_software_i),

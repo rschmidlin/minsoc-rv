@@ -14,32 +14,69 @@
 
 `include "prim_assert.sv"
 
-module ibex_wb #(
-	// Ibex Parameters
-	parameter bit          PMPEnable        = 1'b0,
-	parameter int unsigned PMPGranularity   = 0,
-	parameter int unsigned PMPNumRegions    = 4,
-	parameter int unsigned MHPMCounterNum   = 0,
-	parameter int unsigned MHPMCounterWidth = 40,
-   parameter ibex_pkg::pmp_cfg_t     PMPRstCfg[PMP_MAX_REGIONS]   = ibex_pkg::PmpCfgRst,
-   parameter logic [PMP_ADDR_MSB:0]  PMPRstAddr[PMP_MAX_REGIONS]  = ibex_pkg::PmpAddrRst,
-   parameter ibex_pkg::pmp_mseccfg_t PMPRstMsecCfg                = ibex_pkg::PmpMseccfgRst,
-	parameter bit          RV32E            = 1'b0,
-	parameter bit          RV32M            = 1'b1,
-	parameter bit          RV32B            = 1'b0,
-	parameter bit          RV32ZC           = 1'b0,
-	parameter bit          RegFile          = 1'b0,
-	parameter bit          ICache           = 1'b0,
-	parameter bit          ICacheECC        = 1'b0,
-	parameter bit          ICacheTweakInfection = 1'b0,
-	parameter bit          ICacheScramble   = 1'b0,
-	parameter bit          BranchPrediction = 1'b0,
-	parameter bit          SecureIbex       = 1'b0,
-	parameter bit          DbgTriggerEn     = 1'b0,
-	parameter bit [31:0]   DmBaseAddr       = 32'h1A110000,
-	parameter bit [31:0]   DmAddrMask       = 32'h00000FFF,
-	parameter bit [31:0]   DmHaltAddr       = 32'h1A110800,
-	parameter bit [31:0]   DmExceptionAddr  = 32'h1A110808
+
+`ifndef RV32M
+  `define RV32M ibex_pkg::RV32MFast
+`endif
+
+`ifndef RV32B
+  `define RV32B ibex_pkg::RV32BNone
+`endif
+
+`ifndef RV32ZC
+  `define RV32ZC ibex_pkg::RV32ZcaZcbZcmp
+`endif
+
+`ifndef RegFile
+  `define RegFile ibex_pkg::RegFileFF
+`endif
+
+module ibex_wb import ibex_pkg::*; #(
+	parameter bit                     PMPEnable                    = 1'b0,
+	parameter int unsigned            PMPGranularity               = 0,
+	parameter int unsigned            PMPNumRegions                = 4,
+	parameter int unsigned            MHPMCounterNum               = 0,
+	parameter int unsigned            MHPMCounterWidth             = 40,
+	parameter ibex_pkg::pmp_cfg_t     PMPRstCfg[PMP_MAX_REGIONS]   = ibex_pkg::PmpCfgRst,
+	parameter logic [PMP_ADDR_MSB:0]  PMPRstAddr[PMP_MAX_REGIONS]  = ibex_pkg::PmpAddrRst,
+	parameter ibex_pkg::pmp_mseccfg_t PMPRstMsecCfg                = ibex_pkg::PmpMseccfgRst,
+	parameter bit                     RV32E                        = 1'b0,
+	parameter rv32m_e                 RV32M                        = RV32MFast,
+	parameter rv32b_e                 RV32B                        = RV32BNone,
+	parameter rv32zc_e                RV32ZC                       = RV32ZcaZcbZcmp,
+	parameter regfile_e               RegFile                      = RegFileFF,
+	parameter bit                     BranchTargetALU              = 1'b0,
+	parameter bit                     WritebackStage               = 1'b0,
+	parameter bit                     ICache                       = 1'b0,
+	parameter bit                     ICacheECC                    = 1'b0,
+	parameter bit                     BranchPredictor              = 1'b0,
+	parameter bit                     DbgTriggerEn                 = 1'b0,
+	parameter int unsigned            DbgHwBreakNum                = 1,
+	parameter bit                     SecureIbex                   = 1'b0,
+	parameter int unsigned            LockstepOffset               = 1,
+	parameter bit                     MemECC                       = SecureIbex,
+	parameter int unsigned            MemDataWidth                 = MemECC ? 32 + 7 : 32,
+	parameter bit                     ICacheScramble               = 1'b0,
+	parameter int unsigned            ICacheScrNumPrinceRoundsHalf = 2,
+	parameter bit                     ICacheTweakInfection         = SecureIbex,
+	parameter lfsr_seed_t             RndCnstLfsrSeed              = RndCnstLfsrSeedDefault,
+	parameter lfsr_perm_t             RndCnstLfsrPerm              = RndCnstLfsrPermDefault,
+	parameter int unsigned            DmBaseAddr                   = 32'h1A110000,
+	parameter int unsigned            DmAddrMask                   = 32'h00000FFF,
+	parameter int unsigned            DmHaltAddr                   = 32'h1A110800,
+	parameter int unsigned            DmExceptionAddr              = 32'h1A110808,
+	// Default seed and nonce for scrambling
+	parameter logic [SCRAMBLE_KEY_W-1:0]   RndCnstIbexKey          = RndCnstIbexKeyDefault,
+	parameter logic [SCRAMBLE_NONCE_W-1:0] RndCnstIbexNonce        = RndCnstIbexNonceDefault,
+	// mvendorid: encoding of manufacturer/provider
+	// 0 indicates this field is not implemented. Ibex implementers may wish to set their
+	// own JEDEC ID here.
+	parameter logic [31:0]            CsrMvendorId                 = 32'b0,
+	// mimpid: encoding of processor implementation version
+	// 0 indicates this field is not implemented. Ibex implementers may wish to indicate an
+	// RTL/netlist version here using their own unique encoding (e.g. 32 bits of the git hash of the
+	// implemented commit).
+	parameter logic [31:0]            CsrMimpId                    = 32'b0
 ) (
 	input  wire        clk_i,
 	input  wire        rst_ni,
@@ -135,32 +172,58 @@ module ibex_wb #(
 		.PMPNumRegions(PMPNumRegions),
 		.MHPMCounterNum(MHPMCounterNum),
 		.MHPMCounterWidth(MHPMCounterWidth),
-      .PMPRstCfg[P_MAX_REGIONS](ibex_pkg::PmpCfgRst),
-      .PMPRstAddr[P_MAX_REGIONS](ibex_pkg::PmpAddrRst),
-      .PMPRstMsecCfg(ibex_pkg::PmpMseccfgRst),
+		.PMPRstCfg(PMPRstCfg),
+		.PMPRstAddr(PMPRstAddr),
+		.PMPRstMsecCfg(PMPRstMsecCfg),
 		.RV32E(RV32E),
 		.RV32M(RV32M),
 		.RV32B(RV32B),
 		.RV32ZC(RV32ZC),
 		.RegFile(RegFile),
+		.BranchTargetALU(BranchTargetALU),
+		.WritebackStage(WritebackStage),
 		.ICache(ICache),
 		.ICacheECC(ICacheECC),
-		.ICacheTweakInfection(ICacheTweakInfection),
-		.ICacheScramble(ICacheScramble),
-		.BranchPrediction(BranchPrediction),
-		.SecureIbex(SecureIbex),
+		.BranchPredictor(BranchPredictor),
 		.DbgTriggerEn(DbgTriggerEn),
+		.DbgHwBreakNum(DbgHwBreakNum),
+		.SecureIbex(SecureIbex),
+		.LockstepOffset(LockstepOffset),
+		.MemECC(MemECC),
+		.MemDataWidth(MemDataWidth),
+		.ICacheScramble(ICacheScramble),
+		.ICacheScrNumPrinceRoundsHalf(ICacheScrNumPrinceRoundsHalf),
+		.ICacheTweakInfection(ICacheTweakInfection),
+		.RndCnstLfsrSeed(RndCnstLfsrSeed),
+		.RndCnstLfsrPerm(RndCnstLfsrPerm),
 		.DmBaseAddr(DmBaseAddr),
 		.DmAddrMask(DmAddrMask),
 		.DmHaltAddr(DmHaltAddr),
-		.DmExceptionAddr(DmExceptionAddr)
+		.DmExceptionAddr(DmExceptionAddr),
+		// Default seed and nonce for scrambling
+		.RndCnstIbexKey(RndCnstIbexKey),
+		.RndCnstIbexNonce(RndCnstIbexNonce),
+		// mvendorid: encoding of manufacturer/provider
+		// 0 indicates this field is not implemented. Ibex implementers may wish to set their
+		// own JEDEC ID here.
+		.CsrMvendorId(CsrMvendorId),
+		// mimpid: encoding of processor implementation version
+		// 0 indicates this field is not implemented. Ibex implementers may wish to indicate an
+		// RTL/netlist version here using their own unique encoding (e.g. 32 bits of the git hash of the
+		// implemented commit).
+		.CsrMimpId(CsrMimpId)
 	) i_ibex (
 		// Clock and reset
 		.clk_i(clk_i),
 		.rst_ni(rst_ni),
+
+		
+		// enable all clock gates for testing
 		.test_en_i(1'b0),
-		.scan_rst_ni(1'b1),
-		.ram_cfg_i(10'b0),
+		.ram_cfg_icache_tag_i(1'b0),
+		.ram_cfg_rsp_icache_tag_o(),
+		.ram_cfg_icache_data_i(1'b0),
+		.ram_cfg_rsp_icache_data_o(),
 
 		// Configuration
 		.hart_id_i(hart_id_i),
@@ -195,16 +258,26 @@ module ibex_wb #(
 		.irq_fast_i(irq_fast_i),
 		.irq_nm_i(irq_nm_i),
 
+		// Scrambling Interface
+		.scramble_key_valid_i(1'b0),
+		.scramble_key_i(0),
+		.scramble_nonce_i(0),
+		.scramble_req_o(),
+
 		// Debug interface
 		.debug_req_i(debug_req_i),
 		.crash_dump_o(crash_dump_o),
+		.double_fault_seen_o(),
 
-		// Special control signals
+		// CPU Control Signals
 		.fetch_enable_i(fetch_enable_i),
 		.alert_minor_o(alert_minor_o),
 		.alert_major_internal_o(alert_major_internal_o),
 		.alert_major_bus_o(alert_major_bus_o),
 		.core_sleep_o(core_sleep_o),
+
+		// DFT bypass controls
+		.scan_rst_ni(1'b1),
 
 		// Lockstep signals (not used in this wrapper)
 		.lockstep_cmp_en_o(),
@@ -216,6 +289,8 @@ module ibex_wb #(
 		.data_addr_shadow_o(),
 		.data_wdata_shadow_o(),
 		.data_wdata_intg_shadow_o(),
+
+		// Shadow core instruction interface outputs
 		.instr_req_shadow_o(),
 		.instr_addr_shadow_o()
 	);
