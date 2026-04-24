@@ -30,7 +30,7 @@ filesets:
 
 targets:
   default: &default
-    default_tool: verilator
+    default_tool: icarus
     filesets:
       - soc_files
       - wb_intercon_dep
@@ -44,16 +44,15 @@ targets:
     tools:
       verilator:
         verilator_options: [-Wno-fatal, --trace]
+      icarus:
+        iverilog_options:
+          - -g2012
 
   sim:
     <<: *default
     description: Simulate the design
     parameters:
       - clear_ram
-    tools:
-      icarus:
-        iverilog_options:
-          - -g2012
 
 parameters:
   clear_ram:
