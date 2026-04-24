@@ -90,6 +90,7 @@ module ibex_wb import ibex_pkg::*; #(
 	input  wire        instr_wb_ack,
 	input  wire [31:0] instr_wb_dat_r,
 	input  wire        instr_wb_err,
+	output wire [3:0]  instr_wb_sel,
 
 	// Wishbone Data Memory Interface
 	output wire        data_wb_cyc,
@@ -100,6 +101,7 @@ module ibex_wb import ibex_pkg::*; #(
 	input  wire        data_wb_ack,
 	input  wire [31:0] data_wb_dat_r,
 	input  wire        data_wb_err,
+	output wire [3:0]  data_wb_sel,
 
 	// Configuration
 	input  wire [31:0] hart_id_i,
@@ -351,7 +353,8 @@ module ibex_wb import ibex_pkg::*; #(
 		.wb_adr(instr_wb_adr),
 		.wb_dat_w(instr_wb_dat_w),
 		.wb_ack(instr_wb_ack),
-		.wb_dat_r(instr_wb_dat_r)
+		.wb_dat_r(instr_wb_dat_r),
+		.wb_sel(instr_wb_sel)
 	);
 
 	/*
@@ -374,7 +377,8 @@ module ibex_wb import ibex_pkg::*; #(
 		.wb_adr(data_wb_adr),
 		.wb_dat_w(data_wb_dat_w),
 		.wb_ack(data_wb_ack),
-		.wb_dat_r(data_wb_dat_r)
+		.wb_dat_r(data_wb_dat_r),
+		.wb_sel(data_wb_sel)
 	);
 
 endmodule

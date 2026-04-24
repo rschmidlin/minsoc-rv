@@ -22,7 +22,8 @@ module wb_backend (
     output reg [31:0]  wb_adr,
     output reg [31:0]  wb_dat_w,
     input  wire        wb_ack,
-    input  wire [31:0] wb_dat_r
+    input  wire [31:0] wb_dat_r,
+    output wire [3:0]  wb_sel
 );
 
     reg [3:0] beat_cnt;
@@ -35,6 +36,16 @@ module wb_backend (
     } state_t;
 
     state_t state;
+
+    always @(*) begin
+        case (wb_adr[1:0])
+            2'h0: wb_sel = 4'b1111; // RAM
+            2'h1: wb_sel = 4'b0010; // UART
+            2'h2: wb_sel = 4'b0110; // GPIO
+            2'h3: wb_sel = 4'b1000; // SPI
+            default: wb_sel = 4'b0000;
+        endcase
+    end
 
     always @(posedge clk) begin
         if (rst) begin
@@ -56,7 +67,6 @@ module wb_backend (
                     addr <= req_addr;
                     wb_adr <= req_addr;
                     wb_dat_w <= req_wdata;
-
                     beat_cnt <= req_len;
 
                     state <= RUN;

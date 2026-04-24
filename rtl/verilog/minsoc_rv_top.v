@@ -96,7 +96,7 @@ uart_top #(
 	.wb_rst_i	(wb_rst_i),
 	.wb_adr_i	(uart_reg_addr),
 	.wb_dat_i	(uart_wdata),
-	.wb_sel_i	(4'h0),
+	.wb_sel_i	(wb_m2s_uart_sel),
 	.wb_we_i	(wb_m2s_uart_we),
 	.wb_cyc_i	(wb_m2s_uart_cyc),
 	.wb_stb_i	(wb_m2s_uart_stb),
@@ -230,6 +230,7 @@ uart_top #(
             .instr_wb_ack(wb_s2m_ibexi_ack),
             .instr_wb_dat_r(wb_s2m_ibexi_dat),
             .instr_wb_err(wb_s2m_ibexi_err),
+            .instr_wb_sel(wb_m2s_ibexi_sel), // byte enables for instruction bus only
 
 	// Wishbone Data Memory Interface
             .data_wb_cyc(wb_m2s_ibexd_cyc),
@@ -240,6 +241,7 @@ uart_top #(
             .data_wb_ack(wb_s2m_ibexd_ack),
             .data_wb_dat_r(wb_s2m_ibexd_dat),
             .data_wb_err(wb_s2m_ibexd_err),
+            .data_wb_sel(wb_m2s_ibexd_sel), // byte enables for data bus only
 
 	// Configuration
             .hart_id_i(32'hdeadbeef),
