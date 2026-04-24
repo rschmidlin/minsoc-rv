@@ -1,6 +1,5 @@
 module minsoc_rv_top
   #(parameter MEM_SIZE = 32'h02000000
-  #(parameter IBEX = 1'b1
    )
 (
 		input wb_clk_i,
@@ -127,7 +126,7 @@ picorv32_wb #(
     .ENABLE_COUNTERS64    ( 1 ),
     .ENABLE_REGS_16_31    ( 1 ),
     .ENABLE_REGS_DUALPORT ( 1 ),
-//    .LATCHED_MEM_RDATA    ( 0 ),
+    //.LATCHED_MEM_RDATA    ( 0 ),
     .TWO_STAGE_SHIFT      ( 1 ),
     .BARREL_SHIFTER       ( 0 ),
     .TWO_CYCLE_COMPARE    ( 0 ),
@@ -164,9 +163,25 @@ picorv32_wb #(
     .wbm_ack_i(wb_s2m_picorv32_ack),
     .wbm_dat_i(wb_s2m_picorv32_dat),
 
-    // IRQ Interface (tied off for now)
-    .irq(32'h0),
-    .eoi()
+	// Pico Co-Processor Interface (PCPI)
+	.pcpi_valid(),
+	.pcpi_insn(),
+	.pcpi_rs1(),
+	.pcpi_rs2(),
+	.pcpi_wr(1'b0),
+	.pcpi_rd(32'h0000_0000),
+	.pcpi_wait(1'b0),
+	.pcpi_ready(1'b0),
+   
+   // IRQ Interface (tied off for now)
+   .irq(32'h0),
+   .eoi(),
+   
+	// Trace Interface
+	.trace_valid(),
+	.trace_data(),
+   
+	.mem_instr()
 );
 
 // PicoRV32 does not drive Wishbone B3 cycle type signals;

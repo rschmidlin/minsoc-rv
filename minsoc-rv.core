@@ -21,6 +21,11 @@ filesets:
       - ">=elf-loader-1.0.3"
       - ">=jtag_vpi-r2"
       - ">=vlog_tb_utils-1.0"
+  verilator_tb_files:
+    files:
+      - bench/verilator/minsoc_rv_tb.cpp: {file_type: cppSource}
+    depend:
+      - verilator_tb_utils
   wb_intercon_dep:
     depend: 
       - ~wb_intercon-1.2
@@ -31,51 +36,30 @@ targets:
     filesets:
       - soc_files
       - wb_intercon_dep
-    toplevel: minsoc_rv_top
+      - "!tool_verilator ? (verilog_tb_files)"
+      - "tool_verilator ? (verilator_tb_files)"
+    toplevel: 
+      - "!tool_verilator ? (minsoc_rv_tb)"
+      - "tool_verilator ? (minsoc_rv_top)"
     generate:
       - wb_intercon
-    #parameters:
-    #  - clk_freq_hz
-
-  sim:
-    <<: *default
-    description: Simulate the design
-    default_tool: icarus
-    filesets_append:
-      - verilog_tb_files
-    toplevel: minsoc_rv_tb
-    parameters:
-      - elf_load
-      - clear_ram
-      - timeout
-      - vcd
     tools:
+      verilator:
+        verilator_options: [-Wno-fatal, --trace]
       icarus:
         iverilog_options:
           - -g2012
 
-parameters:
-  elf_load:
-    datatype   : file
-    description: ELF file to preload into RAM
-    paramtype  : plusarg
-    scope      : private
+  sim:
+    <<: *default
+    description: Simulate the design
+    parameters:
+      - clear_ram
 
+parameters:
   clear_ram:
     datatype   : bool
     description: Preset RAM to a known value (0)
-    paramtype  : plusarg
-    scope      : private
-
-  timeout:
-    datatype   : int
-    description: Abort the simulation after this many time units
-    paramtype  : plusarg
-    scope      : private
-
-  vcd:
-    datatype   : bool
-    description: Enable VCD waveform dumping
     paramtype  : plusarg
     scope      : private
 
