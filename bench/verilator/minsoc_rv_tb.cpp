@@ -79,7 +79,7 @@ static int parse_args(int argc, char **argv, VerilatorTbUtils* tbUtils)
 
 #define UART_TX_WAIT (864*2)
 
-void uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
+int uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
 {
     static unsigned int state = 0;
     static uint64_t start_timestamp = 0;
@@ -100,19 +100,17 @@ void uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
                 bitnr = 0;
                 byte = 0;
                 state = 1;
-                printf("uart_decoder_step executed\n");
             }
             break;
         case 1: // wait for start bit
             if (top->uart_stx_o == 0) {
                 state = 2;
                 start_timestamp = tbUtils->getTime();
-                printf("UART: Start bit detected at time %lu\n", start_timestamp);
             }
             break;
         case 2: // wait for data bit
             bit_timestamp = tbUtils->getTime();
-            if (tbUtils->getTime() - start_timestamp >= (UART_TX_WAIT/2)) {
+            if (tbUtils->getTime() - start_timestamp >= (UART_TX_WAIT + (UART_TX_WAIT/2))) {
                 new_bit_expected = true;
                 state = 3;
             }
@@ -121,15 +119,14 @@ void uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
             elapsed = tbUtils->getTime() - bit_timestamp;
             if (new_bit_expected) {
                 new_bit_expected = false;
-                byte |= (top->uart_stx_o << (bitnr-1));
+                byte |= (top->uart_stx_o << bitnr);
                 bitnr++;
             }
             if (elapsed >= UART_TX_WAIT) {
-                if (bitnr >= 8) {
-                    bit_timestamp = tbUtils->getTime();
+                bit_timestamp = tbUtils->getTime();
+                if (bitnr >= 7) {
                     state = 4;
                 } else {
-                    bit_timestamp = tbUtils->getTime();
                     new_bit_expected = true;
                     state = 3;
                 }
@@ -137,15 +134,18 @@ void uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
             break;
         case 4: // wait for stop bit to finish
             elapsed = tbUtils->getTime() - bit_timestamp;
-            if (/*(elapsed >= UART_TX_WAIT) &&*/ (top->uart_stx_o == 1)) {
-                printf("UART: Got byte 0x%02x ('%c') at time %lu\n", byte, byte, tbUtils->getTime());
+            if ((elapsed >= UART_TX_WAIT) && (top->uart_stx_o == 1)) {
+                printf("%c", byte);
+                //printf("UART: Got byte 0x%02x ('%c') at time %lu\n", byte, byte, tbUtils->getTime());
                 state = 0;
+                return byte;
             }
             break;
         default:
             state = 0;
             break;
     }
+    return -1;
 }
 
 int main(int argc, char **argv, char **env)
@@ -178,8 +178,10 @@ int main(int argc, char **argv, char **env)
 
 		tbUtils->doJTAG(&top->tms_pad_i, &top->tdi_pad_i, &top->tck_pad_i, top->tdo_pad_o);
 
-        uart_decoder_step(top, tbUtils);
-		// done = true;
+        int byte = uart_decoder_step(top, tbUtils);
+        if (byte == '\n') {
+            done = true;
+        }
 	}
 
 	printf("Simulation ended at PC = %08x (%lu)\n",
