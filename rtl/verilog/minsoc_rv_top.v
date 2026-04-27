@@ -77,16 +77,8 @@ wb_ram #(
 //
 ////////////////////////////////////////////////////////////////////////
 wire uart_irq;
-
-// Register address from word-aligned bus address
-wire [2:0] uart_reg_addr = wb_m2s_uart_adr[4:2];
-
-// Write data: always in low byte (firmware uses 32-bit word writes)
-wire [7:0] uart_wdata = wb_m2s_uart_dat[7:0];
-
-// Read data: replicate across all four byte lanes
-wire [7:0] uart_rdata;
-assign wb_s2m_uart_dat = {uart_rdata, uart_rdata, uart_rdata, uart_rdata};
+wire [31:0] wb_big_endian_uart_adr;
+assign wb_big_endian_uart_adr = {wb_m2s_uart_adr[31:2], ~wb_m2s_uart_adr[1:0]};  // Convert little-endian word address to big-endian byte address
 
 uart_top #(
 	.debug	(0),
@@ -94,13 +86,13 @@ uart_top #(
 ) uart16550 (
 	.wb_clk_i	(wb_clk_i),
 	.wb_rst_i	(wb_rst_i),
-	.wb_adr_i	(uart_reg_addr),
-	.wb_dat_i	(uart_wdata),
+	.wb_adr_i	(wb_big_endian_uart_adr),
+	.wb_dat_i	(wb_m2s_uart_dat),
 	.wb_sel_i	(wb_m2s_uart_sel),
 	.wb_we_i	(wb_m2s_uart_we),
 	.wb_cyc_i	(wb_m2s_uart_cyc),
 	.wb_stb_i	(wb_m2s_uart_stb),
-	.wb_dat_o	(uart_rdata),
+	.wb_dat_o	(wb_s2m_uart_dat),
 	.wb_ack_o	(wb_s2m_uart_ack),
         .int_o		(uart_irq),
 	.srx_pad_i	(uart_srx_i),

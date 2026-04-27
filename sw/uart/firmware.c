@@ -41,16 +41,17 @@ void _start(void)
 /* ------------------------------------------------------------------ */
 #define UART_BASE  0x90000000
 
+#define REG8(addr) (*(volatile unsigned char *)(addr))
 #define REG32(addr) (*(volatile unsigned int *)(addr))
 
 #define UART_TX    0x00   /* Transmit buffer  (DLAB=0, write)  */
 #define UART_RX    0x00   /* Receive  buffer  (DLAB=0, read)   */
 #define UART_DLL   0x00   /* Divisor Latch Low  (DLAB=1)       */
-#define UART_DLM   0x04   /* Divisor Latch High (DLAB=1)       */
-#define UART_IER   0x04   /* Interrupt Enable Register         */
-#define UART_FCR   0x08   /* FIFO Control Register (write)     */
-#define UART_LCR   0x0C   /* Line Control Register             */
-#define UART_LSR   0x14   /* Line Status Register              */
+#define UART_DLM   0x01   /* Divisor Latch High (DLAB=1)       */
+#define UART_IER   0x01   /* Interrupt Enable Register         */
+#define UART_FCR   0x02   /* FIFO Control Register (write)     */
+#define UART_LCR   0x03   /* Line Control Register             */
+#define UART_LSR   0x05   /* Line Status Register              */
 
 /* FCR bits */
 #define UART_FCR_ENABLE_FIFO  0x01
@@ -84,41 +85,41 @@ void _start(void)
 /* ------------------------------------------------------------------ */
 
 #define WAIT_FOR_THRE \
-    do { lsr = REG32(UART_BASE + UART_LSR); } while ((lsr & UART_LSR_THRE) != UART_LSR_THRE)
+    do { lsr = REG8(UART_BASE + UART_LSR); } while ((lsr & UART_LSR_THRE) != UART_LSR_THRE)
 
 #define WAIT_FOR_XMITR \
-    do { lsr = REG32(UART_BASE + UART_LSR); } while ((lsr & BOTH_EMPTY) != BOTH_EMPTY)
+    do { lsr = REG8(UART_BASE + UART_LSR); } while ((lsr & BOTH_EMPTY) != BOTH_EMPTY)
 
 static void uart_init(void)
 {
     unsigned int divisor;
 
     /* Reset & enable FIFOs */
-    REG32(UART_BASE + UART_FCR) = UART_FCR_ENABLE_FIFO
+    REG8(UART_BASE + UART_FCR) = UART_FCR_ENABLE_FIFO
                                  | UART_FCR_CLEAR_RCVR
                                  | UART_FCR_CLEAR_XMIT
                                  | UART_FCR_TRIGGER_1;
 
     /* No interrupts */
-    REG32(UART_BASE + UART_IER) = 0x00;
+    REG8(UART_BASE + UART_IER) = 0x00;
 
     /* 8N1 */
-    REG32(UART_BASE + UART_LCR) = UART_LCR_WLEN8
+    REG8(UART_BASE + UART_LCR) = UART_LCR_WLEN8
                                  & ~(UART_LCR_STOP | UART_LCR_PARITY);
 
     /* Set baud rate using read-modify-write on LCR for DLAB */
     divisor = SYS_CLK / (16 * UART_BAUDRATE);
-    REG32(UART_BASE + UART_LCR) |= UART_LCR_DLAB;
-    REG32(UART_BASE + UART_DLM)  = (divisor >> 8) & 0xFF;
-    REG32(UART_BASE + UART_DLL)  = divisor & 0xFF;
-    REG32(UART_BASE + UART_LCR) &= ~UART_LCR_DLAB;
+    REG8(UART_BASE + UART_LCR) |= UART_LCR_DLAB;
+    REG8(UART_BASE + UART_DLM)  = (divisor >> 8) & 0xFF;
+    REG8(UART_BASE + UART_DLL)  = divisor & 0xFF;
+    REG8(UART_BASE + UART_LCR) &= ~UART_LCR_DLAB;
 }
 
 static void uart_putc(char c)
 {
     unsigned int lsr;
     WAIT_FOR_THRE;
-    REG32(UART_BASE + UART_TX) = c;
+    REG8(UART_BASE + UART_TX) = c;
     WAIT_FOR_XMITR;
 }
 
@@ -134,10 +135,7 @@ static void uart_print_str(const char *s)
 int main(void)
 {
     uart_init();
-    uart_print_str("Hello World.");
-    
-    // The linefeed was not being printed initially, also PicoRV32 was not sending it to UART
-    uart_putc('\n');
+    uart_print_str("Hello World.\n");
 
     /* Spin forever */
     while (1)

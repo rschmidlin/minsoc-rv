@@ -80,6 +80,7 @@ generate:
           offset : 0
           size : 0x2000000
         uart:
+          datawidth : 8
           offset : 0x90000000
           size : 0x20
   

@@ -7,30 +7,6 @@
  * converted to Wishbone B4 interfaces.
  */
 
-`ifdef RISCV_FORMAL
-  `define RVFI
-`endif
-
-
-`include "prim_assert.sv"
-
-
-`ifndef RV32M
-  `define RV32M ibex_pkg::RV32MFast
-`endif
-
-`ifndef RV32B
-  `define RV32B ibex_pkg::RV32BNone
-`endif
-
-`ifndef RV32ZC
-  `define RV32ZC ibex_pkg::RV32ZcaZcbZcmp
-`endif
-
-`ifndef RegFile
-  `define RegFile ibex_pkg::RegFileFF
-`endif
-
 module ibex_wb import ibex_pkg::*; #(
 	parameter bit                     PMPEnable                    = 1'b0,
 	parameter int unsigned            PMPGranularity               = 0,
@@ -314,6 +290,7 @@ module ibex_wb import ibex_pkg::*; #(
 	assign instr_req_we = 1'b0;      // Instructions are always reads
 	assign instr_req_wdata = 32'b0;
 	assign instr_req_len = 4'h1;     // Single beat
+	assign instr_wb_sel = 4'hF;     // Always select all bytes for instruction fetches
 
 	/*
 	 * Data Memory Interface to Request/Response Adapter
@@ -332,6 +309,7 @@ module ibex_wb import ibex_pkg::*; #(
 	assign data_req_we = data_we;
 	assign data_req_wdata = data_wdata;
 	assign data_req_len = 4'h1;  // Single beat
+	assign data_wb_sel = data_be;
 
 	/*
 	 * Instruction Wishbone Backend Adapter Instance
