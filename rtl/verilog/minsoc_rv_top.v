@@ -107,157 +107,78 @@ uart_top #(
    assign wb_s2m_uart_err = 1'b0;
    assign wb_s2m_uart_rty = 1'b0;
 
-    generate if (IBEX == 1'b0) begin 
-        ////////////////////////////////////////////////////////////////////////
-        //
-        // PicoRV32 RISC-V Core with Wishbone Interface
-        //
-        ////////////////////////////////////////////////////////////////////////
 
-        picorv32_wb #(
-            .ENABLE_COUNTERS      ( 1 ),
-            .ENABLE_COUNTERS64    ( 1 ),
-            .ENABLE_REGS_16_31    ( 1 ),
-            .ENABLE_REGS_DUALPORT ( 1 ),
-            //.LATCHED_MEM_RDATA    ( 0 ),
-            .TWO_STAGE_SHIFT      ( 1 ),
-            .BARREL_SHIFTER       ( 0 ),
-            .TWO_CYCLE_COMPARE    ( 0 ),
-            .TWO_CYCLE_ALU        ( 0 ),
-            .COMPRESSED_ISA       ( 0 ),
-            .CATCH_MISALIGN       ( 1 ),
-            .CATCH_ILLINSN        ( 1 ),
-            .ENABLE_PCPI          ( 0 ),
-            .ENABLE_MUL           ( 0 ),
-            .ENABLE_FAST_MUL      ( 0 ),
-            .ENABLE_DIV           ( 0 ),
-            .ENABLE_IRQ           ( 1 ),
-            .ENABLE_IRQ_QREGS     ( 1 ),
-            .ENABLE_IRQ_TIMER     ( 1 ),
-            .ENABLE_TRACE         ( 0 ),
-            .REGS_INIT_ZERO       ( 0 ),
-            .MASKED_IRQ           ( 32'h0000_0000 ),
-            .LATCHED_IRQ          ( 32'hffff_ffff ),
-            .PROGADDR_RESET       ( 32'h0000_0000 ),
-            .PROGADDR_IRQ         ( 32'h0000_0010 ),
-            .STACKADDR            ( 32'hffff_ffff )
-        ) u_picorv32_wb (
-            .wb_clk_i(wb_clk),
-            .wb_rst_i(wb_rst),
-            .trap(),
+   wire irq_software_i, irq_timer_i, irq_external_i, irq_nm_i;
+   wire [14:0] irq_fast_i;
 
-            // Wishbone Master Interface - routed to memory interconnect
-            .wbm_cyc_o(wb_m2s_picorv32_cyc),
-            .wbm_stb_o(wb_m2s_picorv32_stb),
-            .wbm_we_o(wb_m2s_picorv32_we),
-            .wbm_adr_o(wb_m2s_picorv32_adr),
-            .wbm_dat_o(wb_m2s_picorv32_dat),
-            .wbm_sel_o(wb_m2s_picorv32_sel),
-            .wbm_ack_i(wb_s2m_picorv32_ack),
-            .wbm_dat_i(wb_s2m_picorv32_dat),
+   wire debug_req_i;
+   wire [63:0] crash_dump_o;
 
-            // Pico Co-Processor Interface (PCPI)
-            .pcpi_valid(),
-            .pcpi_insn(),
-            .pcpi_rs1(),
-            .pcpi_rs2(),
-            .pcpi_wr(1'b0),
-            .pcpi_rd(32'h0000_0000),
-            .pcpi_wait(1'b0),
-            .pcpi_ready(1'b0),
-        
-        // IRQ Interface (tied off for now)
-        .irq(32'h0),
-        .eoi(),
-        
-            // Trace Interface
-            .trace_valid(),
-            .trace_data(),
-        
-            .mem_instr()
-        );
+   wire alert_minor_o, alert_major_internal_o, alert_major_bus_o, core_sleep_o;
+   wire [3:0] fetch_enable_i;
 
-        // PicoRV32 does not drive Wishbone B3 cycle type signals;
-        // tie to classic cycle (cti=000, bte=00) so the interconnect
-        // and wb_ram accept the transactions.
-        assign wb_m2s_picorv32_cti = 3'b000;
-        assign wb_m2s_picorv32_bte = 2'b00;
-    end // if (IBEX == 1'b0)
-    else begin
+   assign irq_software_i = 1'b0;
+   assign irq_timer_i = 1'b0;
+   assign irq_external_i = 1'b0;
+   assign irq_nm_i = 1'b0;
+   assign irq_fast_i = 15'h0000;
 
-    wire irq_software_i, irq_timer_i, irq_external_i, irq_nm_i;
-    wire [14:0] irq_fast_i;
+   assign debug_req_i = 1'b0;
 
-    wire debug_req_i;
-    wire [63:0] crash_dump_o;
-
-    wire alert_minor_o, alert_major_internal_o, alert_major_bus_o, core_sleep_o;
-    wire [3:0] fetch_enable_i;
-
-    assign irq_software_i = 1'b0;
-    assign irq_timer_i = 1'b0;
-    assign irq_external_i = 1'b0;
-    assign irq_nm_i = 1'b0;
-    assign irq_fast_i = 15'h0000;
-
-    assign debug_req_i = 1'b0;
-
-    assign fetch_enable_i = 4'b0101;
-    
-    ibex_wb #(
-        .PMPEnable(1'b0),
-        .PMPGranularity(0),
-        .PMPNumRegions(4)
+   assign fetch_enable_i = 4'b0101;
+   
+   ibex_wb #(
+      .PMPEnable(1'b0),
+      .PMPGranularity(0),
+      .PMPNumRegions(4)
 )
-    u_ibex (
-            .clk_i(wb_clk),
-            .rst_ni(~wb_rst),
+   u_ibex (
+         .clk_i(wb_clk),
+         .rst_ni(~wb_rst),
 
-	// Wishbone Instruction Memory Interface
-            .instr_wb_cyc(wb_m2s_ibexi_cyc),
-            .instr_wb_stb(wb_m2s_ibexi_stb),
-            .instr_wb_we(wb_m2s_ibexi_we),
-            .instr_wb_adr(wb_m2s_ibexi_adr),
-            .instr_wb_dat_w(wb_m2s_ibexi_dat),
-            .instr_wb_ack(wb_s2m_ibexi_ack),
-            .instr_wb_dat_r(wb_s2m_ibexi_dat),
-            .instr_wb_err(wb_s2m_ibexi_err),
-            .instr_wb_sel(wb_m2s_ibexi_sel), // byte enables for instruction bus only
+// Wishbone Instruction Memory Interface
+         .instr_wb_cyc(wb_m2s_ibexi_cyc),
+         .instr_wb_stb(wb_m2s_ibexi_stb),
+         .instr_wb_we(wb_m2s_ibexi_we),
+         .instr_wb_adr(wb_m2s_ibexi_adr),
+         .instr_wb_dat_w(wb_m2s_ibexi_dat),
+         .instr_wb_ack(wb_s2m_ibexi_ack),
+         .instr_wb_dat_r(wb_s2m_ibexi_dat),
+         .instr_wb_err(wb_s2m_ibexi_err),
+         .instr_wb_sel(wb_m2s_ibexi_sel), // byte enables for instruction bus only
 
-	// Wishbone Data Memory Interface
-            .data_wb_cyc(wb_m2s_ibexd_cyc),
-            .data_wb_stb(wb_m2s_ibexd_stb),
-            .data_wb_we(wb_m2s_ibexd_we),
-            .data_wb_adr(wb_m2s_ibexd_adr),
-            .data_wb_dat_w(wb_m2s_ibexd_dat),
-            .data_wb_ack(wb_s2m_ibexd_ack),
-            .data_wb_dat_r(wb_s2m_ibexd_dat),
-            .data_wb_err(wb_s2m_ibexd_err),
-            .data_wb_sel(wb_m2s_ibexd_sel), // byte enables for data bus only
+// Wishbone Data Memory Interface
+         .data_wb_cyc(wb_m2s_ibexd_cyc),
+         .data_wb_stb(wb_m2s_ibexd_stb),
+         .data_wb_we(wb_m2s_ibexd_we),
+         .data_wb_adr(wb_m2s_ibexd_adr),
+         .data_wb_dat_w(wb_m2s_ibexd_dat),
+         .data_wb_ack(wb_s2m_ibexd_ack),
+         .data_wb_dat_r(wb_s2m_ibexd_dat),
+         .data_wb_err(wb_s2m_ibexd_err),
+         .data_wb_sel(wb_m2s_ibexd_sel), // byte enables for data bus only
 
-	// Configuration
-            .hart_id_i(32'hdeadbeef),
-            .boot_addr_i(32'h00000000),
+// Configuration
+         .hart_id_i(32'hdeadbeef),
+         .boot_addr_i(32'h00000000),
 
-	// Interrupt inputs
-            .irq_software_i(irq_software_i),
-            .irq_timer_i(irq_timer_i),
-            .irq_external_i(irq_external_i),
-            .irq_fast_i(irq_fast_i),
-            .irq_nm_i(irq_nm_i),
+// Interrupt inputs
+         .irq_software_i(irq_software_i),
+         .irq_timer_i(irq_timer_i),
+         .irq_external_i(irq_external_i),
+         .irq_fast_i(irq_fast_i),
+         .irq_nm_i(irq_nm_i),
 
-	// Debug interface (optional)
-            .debug_req_i(debug_req_i),
-            .crash_dump_o(crash_dump_o),
+// Debug interface (optional)
+         .debug_req_i(debug_req_i),
+         .crash_dump_o(crash_dump_o),
 
-	// Control signals
-            .fetch_enable_i(fetch_enable_i),
-            .alert_minor_o(alert_minor_o),
-            .alert_major_internal_o(alert_major_internal_o),
-            .alert_major_bus_o(alert_major_bus_o),
-            .core_sleep_o(core_sleep_o)
-            );
-    end
-    endgenerate
+// Control signals
+         .fetch_enable_i(fetch_enable_i),
+         .alert_minor_o(alert_minor_o),
+         .alert_major_internal_o(alert_major_internal_o),
+         .alert_major_bus_o(alert_major_bus_o),
+         .core_sleep_o(core_sleep_o)
+         );
 
 endmodule

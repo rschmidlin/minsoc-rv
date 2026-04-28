@@ -1,8 +1,11 @@
-If you install edalize over pipx, need to export the path and make it available to fusesoc:
+Install fusesoc, edalize and packaging in a virtual environment. 
 
 ```
-pipx inject fusesoc edalize
-export PYTHONPATH=$(python3 -c "import site; print('/home/user/.local/pipx/venvs/fusesoc/lib/python3.11/site-packages')")
+python -m venv .venv
+source .venv/bin/activate
+pip install fusesoc
+pip install edalize
+pip install packaging
 ```
 
 By calling the following command after compiling sw/firmware, you can see Hello World. on the screen. 

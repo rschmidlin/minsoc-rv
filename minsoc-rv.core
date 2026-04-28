@@ -25,6 +25,7 @@ filesets:
     files:
       - bench/verilator/minsoc_rv_tb.cpp: {file_type: cppSource}
     depend:
+      - "lowrisc:prim_generic:all"
       - verilator_tb_utils
   wb_intercon_dep:
     depend: 
