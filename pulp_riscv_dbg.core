@@ -1,0 +1,54 @@
+CAPI=2:
+# Copyright lowRISC contributors.
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+name: "pulp:riscv:debug_module"
+description: "RISC-V Debug Module"
+
+filesets:
+  files_src:
+    depend:
+      - lowrisc:prim:fifo
+      - lowrisc:prim:clock_inv
+    files:
+      - vendor/riscv-dbg/debug_rom/debug_rom.sv
+      - vendor/riscv-dbg/debug_rom/debug_rom_one_scratch.sv
+      - vendor/riscv-dbg/src/dm_pkg.sv
+      - vendor/riscv-dbg/src/dm_sba.sv
+      - vendor/riscv-dbg/src/dm_csrs.sv
+      - vendor/riscv-dbg/src/dm_mem.sv
+      - vendor/riscv-dbg/src/dmi_cdc.sv
+      - vendor/riscv-dbg/src/dmi_jtag.sv
+      - vendor/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_sync_reqack.sv
+    file_type: systemVerilogSource
+
+  files_xilinx_bscane_tap:
+    files:
+      - vendor/riscv-dbg/src/dmi_bscane_tap.sv
+    file_type: systemVerilogSource
+
+  files_jtag_tap:
+    files:
+      - vendor/riscv-dbg/src/dmi_jtag_tap.sv
+    file_type: systemVerilogSource
+
+  files_verilator:
+    depend:
+      # common waivers
+      - lowrisc:lint:common
+
+targets:
+  default:
+    filesets:
+      - files_src
+      - tool_verilator ? (files_verilator)
+      - target_synth ? (files_xilinx_bscane_tap)
+      - target_synth_cw305 ? (files_xilinx_bscane_tap)
+      - target_synth_cw312a35 ? (files_xilinx_bscane_tap)
+      - target_synth_blackboard ? (files_xilinx_bscane_tap)
+      - target_synth_boolean ? (files_xilinx_bscane_tap)
+      - target_synth_nexysa7 ? (files_xilinx_bscane_tap)
+      - target_synth_artys7-25 ? (files_xilinx_bscane_tap)
+      - target_synth_artys7-50 ? (files_xilinx_bscane_tap)
+      - target_synth_sonata ? (files_jtag_tap)
+      - tool_verilator ? (files_jtag_tap)

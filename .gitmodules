@@ -1,0 +1,6 @@
+[submodule "vendor/ibex"]
+	path = vendor/ibex
+	url = https://github.com/lowRISC/ibex.git
+[submodule "vendor/riscv-dbg"]
+	path = vendor/riscv-dbg
+	url = https://github.com/pulp-platform/riscv-dbg.git

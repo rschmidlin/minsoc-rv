@@ -12,6 +12,7 @@ filesets:
     file_type: verilogSource
     depend:
       - "lowrisc:ibex:ibex_top"
+      - "pulp:riscv:debug_module"
       - ">=uart16550-1.5.4"
       - ">=wb_ram-1.0"
   verilog_tb_files:
@@ -30,6 +31,9 @@ filesets:
   wb_intercon_dep:
     depend: 
       - ~wb_intercon-1.2
+  xilinx_files:
+    depend:
+      - "lowrisc:prim_xilinx:all"
 
 targets:
   default: &default
@@ -39,9 +43,11 @@ targets:
       - wb_intercon_dep
       - "!tool_verilator ? (verilog_tb_files)"
       - "tool_verilator ? (verilator_tb_files)"
+      - "tool_vivado ? (xilinx_files)"
     toplevel: 
       - "!tool_verilator ? (minsoc_rv_tb)"
       - "tool_verilator ? (minsoc_rv_top)"
+      - "tool_vivado ? (minsoc_rv_top)"
     generate:
       - wb_intercon
     tools:
@@ -56,6 +62,15 @@ targets:
     description: Simulate the design
     parameters:
       - clear_ram
+
+  synth:
+    <<: *default
+    description: Synthesize the design for a Nexys Video FPGA board
+    default_tool: vivado
+    #filesets_append: []
+    tools:
+      vivado:
+        part: xc7a200tsbg484-1
 
 parameters:
   clear_ram:
