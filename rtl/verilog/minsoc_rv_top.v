@@ -108,6 +108,41 @@ uart_top #(
    assign wb_s2m_uart_rty = 1'b0;
 
 
+   //
+   // Ibex
+   //
+
+
+  wire        mem_instr_req;
+  wire [31:0] mem_instr_rdata;
+  wire        dbg_instr_req;
+
+  // Internally generated resets cause IMPERFECTSCH warnings
+  /* verilator lint_off IMPERFECTSCH */
+  wire rst_core_n;
+  wire ndmreset_req;
+  wire dm_debug_req;
+
+  assign mem_instr_req =
+      core_instr_req & ((core_instr_addr & cfg_device_addr_mask[Ram]) == cfg_device_addr_base[Ram]);
+
+  assign dbg_instr_req =
+      core_instr_req & ((core_instr_addr & cfg_device_addr_mask[DbgDev]) == cfg_device_addr_base[DbgDev]);
+
+  assign core_instr_gnt = mem_instr_req | (dbg_instr_req & ~device_req[DbgDev]);
+
+  always @(posedge wb_clk or posedge wb_rst) begin
+    if (wb_rst) begin
+      core_instr_rvalid  <= 1'b0;
+      core_instr_sel_dbg <= 1'b0;
+    end else begin
+      core_instr_rvalid  <= core_instr_gnt;
+      core_instr_sel_dbg <= dbg_instr_req;
+    end
+
+  assign rst_core_n = ~wb_rst & ~ndmreset_req;
+  assign core_instr_rdata = core_instr_sel_dbg ? dbg_device_rdata : mem_instr_rdata;
+
    wire irq_software_i, irq_timer_i, irq_external_i, irq_nm_i;
    wire [14:0] irq_fast_i;
 
@@ -134,7 +169,7 @@ uart_top #(
 )
    u_ibex (
          .clk_i(wb_clk),
-         .rst_ni(~wb_rst),
+         .rst_ni(rst_core_n),
 
 // Wishbone Instruction Memory Interface
          .instr_wb_cyc(wb_m2s_ibexi_cyc),
@@ -181,4 +216,48 @@ uart_top #(
          .core_sleep_o(core_sleep_o)
          );
 
+
+minsoc_riscv_dbg riscv_dbg(
+    .clk_i(wb_clk),
+    .rst_ni(~wb_rst),
+    .next_dm_addr_i(next_dm_addr_i),
+    .testmode_i(testmode_i),
+    .ndmreset_o(ndmreset_req),
+    .ndmreset_ack_i(ndmreset_ack_i),
+    .dmactive_o(dmactive_o),
+    .debug_req_o(debug_req_o),
+    .unavailable_i(unavailable_i),
+    .hartinfo_i(hartinfo_i),
+
+    // Wishbone Slave Interface
+	 .slave_wb_cyc_i(dbgs_m2s_wb_cyc),
+	 .slave_wb_stb_i(dbgs_m2s_wb_stb),
+	 .slave_wb_we_i(dbgs_m2s_wb_we),
+	 .slave_wb_adr_i(dbgs_m2s_wb_adr),
+	 .slave_wb_dat_w_i(dbgs_m2s_wb_dat),
+	 .slave_wb_ack_o(dbgs_s2m_wb_ack),
+	 .slave_wb_dat_r_o(dbgs_s2m_wb_dat),
+	 .slave_wb_err_o(dbgs_s2m_wb_err),
+	 .slave_wb_sel_i(dbgs_m2s_wb_sel)
+
+    // Wishbone Master Interface
+    .master_wb_cyc_o(dbgm_m2s_wb_cyc),
+    .master_wb_stb_o(dbgm_m2s_wb_stb),
+    .master_wb_we_o(dbgm_m2s_wb_we),
+    .master_wb_adr_o(dbgm_m2s_wb_adr),
+    .master_wb_dat_w_o(dbgm_m2s_wb_dat),
+    .master_wb_ack_i(dbgm_s2m_wb_ack),
+    .master_wb_dat_r_i(dbgm_s2m_wb_dat),
+    .master_wb_err_i(dbgm_s2m_wb_err),
+    .master_wb_sel_o(dbgm_m2s_wb_sel),
+
+    // Connection to DTM
+    .dmi_rst_ni(dmi_rst_ni),
+    .dmi_req_valid_i(dmi_req_valid_i),
+    .dmi_req_ready_o(dmi_req_ready_o),
+    .dmi_req_i(dmi_req_i),
+    .dmi_req_valid_o(dmi_req_valid_o),
+    .dmi_req_ready_i(dmi_req_ready_i),
+    .dmi_resp_o(dmi_resp_o)
+);
 endmodule
