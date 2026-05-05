@@ -48,7 +48,7 @@ module wb_backend (
 
     reg cyc, stb, we, busyq, resp_validq;
     reg [31:0] dat_w, addr, resp_rdataq, single_transaction_addr;
-    reg req_validq, wb_ackq, single_transaction_busy;
+    reg single_transaction_busy;
 
     wire burst_transaction;
 
@@ -66,14 +66,10 @@ module wb_backend (
 
     always @(posedge clk) begin
         if (rst) begin
-            wb_ackq <= 1'b0;
-            req_validq <= 1'b0;
             single_transaction_addr <= 32'h0000_0000;
             single_transaction_busy <= 1'b0;
         end
         else begin
-            wb_ackq <= wb_ack;
-            req_validq <= req_valid;
             if (req_valid && !single_transaction_busy) begin
                 single_transaction_addr <= req_addr;
                 single_transaction_busy <= 1'b1;
