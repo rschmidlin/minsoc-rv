@@ -1,6 +1,7 @@
 module minsoc_rv_top
   #(parameter MEM_SIZE = 32'h02000000,
-    parameter IBEX = 1'b1
+    parameter IBEX = 1'b1,
+    parameter memfile = ""
    )
 (
 		input wb_clk_i,
@@ -34,7 +35,8 @@ wire wb_rst = wb_rst_i;
 //
 ////////////////////////////////////////////////////////////////////////
 wb_ram #(
-	.depth	(MEM_SIZE)
+	.depth	(MEM_SIZE),
+   .memfile (memfile)
 ) wb_bfm_memory0 (
 	//Wishbone Master interface
 	.wb_clk_i	(wb_clk_i),

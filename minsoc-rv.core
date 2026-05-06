@@ -32,8 +32,16 @@ filesets:
     depend: 
       - ~wb_intercon-1.2
   xilinx_files:
+    files:
+      - rtl/fpga/top_nexysa7.sv
+    file_type: systemVerilogSource
     depend:
       - "lowrisc:prim_xilinx:all"
+      - "lowrisc:ibex:fpga_xilinx_shared"
+  files_constraints:
+    files:
+      - data/pins_nexysa7.xdc
+    file_type: xdc
 
 targets:
   default: &default
@@ -67,16 +75,25 @@ targets:
     <<: *default
     description: Synthesize the design for a Nexys Video FPGA board
     default_tool: vivado
-    #filesets_append: []
+    filesets_append: 
+      - files_constraints
     tools:
       vivado:
         part: xc7a200tsbg484-1
+    parameters:
+      - memfile
 
 parameters:
   clear_ram:
     datatype   : bool
     description: Preset RAM to a known value (0)
     paramtype  : plusarg
+    scope      : private
+
+  memfile:
+    datatype   : str
+    description: File to preload the block RAM with - must be vmem hex format
+    paramtype  : vlogparam
     scope      : private
 
 generate:
