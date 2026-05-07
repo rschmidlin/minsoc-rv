@@ -29,13 +29,11 @@ module wb_backend (
     reg [3:0] beat_cnt;
     reg [31:0] addr;
 
-    typedef enum logic [1:0] {
-        IDLE,
-        RUN,
-        DONE
-    } state_t;
+    reg [1:0] state;
 
-    state_t state;
+    localparam IDLE = 2'h0;
+    localparam RUN = 2'h1;
+    localparam DONE = 2'h2;
 
     always @(*) begin
         case (wb_adr[1:0])
