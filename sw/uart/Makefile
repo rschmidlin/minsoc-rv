@@ -19,7 +19,7 @@ $(TARGET).elf: firmware.c link.ld
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ firmware.c
 
 $(TARGET).bin: $(TARGET).elf
-	$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) -O verilog $< $@
 
 $(TARGET).dis: $(TARGET).elf
 	$(OBJDUMP) -d $< > $@
