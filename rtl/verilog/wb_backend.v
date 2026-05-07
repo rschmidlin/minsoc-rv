@@ -39,10 +39,10 @@ module wb_backend (
 
     always @(*) begin
         case (wb_adr[1:0])
-            2'h0: wb_sel = 4'b1111; // RAM
-            2'h1: wb_sel = 4'b0010; // UART
-            2'h2: wb_sel = 4'b0110; // GPIO
-            2'h3: wb_sel = 4'b1000; // SPI
+            2'h0: wb_sel = 4'b1111;
+            2'h1: wb_sel = 4'b0010;
+            2'h2: wb_sel = 4'b0110;
+            2'h3: wb_sel = 4'b1000;
             default: wb_sel = 4'b0000;
         endcase
     end
