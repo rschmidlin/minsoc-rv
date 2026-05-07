@@ -308,7 +308,6 @@ module ibex_wb import ibex_pkg::*; #(
 	assign data_req_we = data_we;
 	assign data_req_wdata = data_wdata;
 	assign data_req_len = 4'h1;  // Single beat
-	assign data_wb_sel = data_be;
 
 	/*
 	 * Instruction Wishbone Backend Adapter Instance

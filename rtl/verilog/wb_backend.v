@@ -28,6 +28,7 @@ module wb_backend (
 
     reg [3:0] beat_cnt;
     reg [31:0] addr;
+    reg [3:0] sel;
 
     reg [1:0] state;
 
@@ -37,11 +38,11 @@ module wb_backend (
 
     always @(*) begin
         case (wb_adr[1:0])
-            2'h0: wb_sel = 4'b1111;
-            2'h1: wb_sel = 4'b0010;
-            2'h2: wb_sel = 4'b0110;
-            2'h3: wb_sel = 4'b1000;
-            default: wb_sel = 4'b0000;
+            2'h0: sel = 4'b1111;
+            2'h1: sel = 4'b0010;
+            2'h2: sel = 4'b0110;
+            2'h3: sel = 4'b1000;
+            default: sel = 4'b0000;
         endcase
     end
 
@@ -50,6 +51,7 @@ module wb_backend (
             state <= IDLE;
             wb_cyc <= 0;
             wb_stb <= 0;
+            wb_sel <= 1'b0;
             busy <= 0;
         end else begin
             resp_valid <= 0;
@@ -66,6 +68,7 @@ module wb_backend (
                     wb_adr <= req_addr;
                     wb_dat_w <= req_wdata;
                     beat_cnt <= req_len;
+                    wb_sel <= sel;
 
                     state <= RUN;
                 end

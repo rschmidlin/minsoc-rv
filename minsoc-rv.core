@@ -14,7 +14,7 @@ filesets:
       - "lowrisc:ibex:ibex_top"
       - "pulp:riscv:debug_module"
       - ">=uart16550-1.5.4"
-      - ">=wb_ram-1.0"
+      - "=wb_ram-1.1-r2026"
   verilog_tb_files:
     files:
       - bench/verilog/minsoc_rv_tb.v: {file_type: verilogSource}
