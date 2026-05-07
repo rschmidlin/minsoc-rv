@@ -23,7 +23,7 @@ module wb_backend (
     output reg [31:0]  wb_dat_w,
     input  wire        wb_ack,
     input  wire [31:0] wb_dat_r,
-    output wire [3:0]  wb_sel
+    output reg [3:0]   wb_sel
 );
 
     reg [3:0] beat_cnt;
