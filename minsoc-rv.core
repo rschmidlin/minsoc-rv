@@ -49,13 +49,13 @@ targets:
     filesets:
       - soc_files
       - wb_intercon_dep
-      - "!tool_verilator ? (verilog_tb_files)"
+      - "tool_icarus ? (verilog_tb_files)"
       - "tool_verilator ? (verilator_tb_files)"
       - "tool_vivado ? (xilinx_files)"
     toplevel: 
-      - "!tool_verilator ? (minsoc_rv_tb)"
+      - "tool_icarus ? (minsoc_rv_tb)"
       - "tool_verilator ? (minsoc_rv_top)"
-      - "tool_vivado ? (minsoc_rv_top)"
+      - "tool_vivado ? (top_nexysa7)"
     generate:
       - wb_intercon
     tools:
@@ -79,7 +79,7 @@ targets:
       - files_constraints
     tools:
       vivado:
-        part: xc7a200tsbg484-1
+        part: xc7a100csg324-2
     parameters:
       - memfile
 

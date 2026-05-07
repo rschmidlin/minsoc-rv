@@ -12,6 +12,7 @@ Prepare fusesoc
 
 ```
 fusesoc library add fusesoc-cores https://github.com/fusesoc/fusesoc-cores
+fusesoc library add elf-loader https://github.com/fusesoc/elf-loader.git
 fusesoc library add minsoc-rv
 ```
 
