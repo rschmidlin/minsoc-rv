@@ -290,7 +290,6 @@ module ibex_wb import ibex_pkg::*; #(
 	assign instr_req_we = 1'b0;      // Instructions are always reads
 	assign instr_req_wdata = 32'b0;
 	assign instr_req_len = 4'h1;     // Single beat
-	assign instr_wb_sel = 4'hF;     // Always select all bytes for instruction fetches
 
 	/*
 	 * Data Memory Interface to Request/Response Adapter

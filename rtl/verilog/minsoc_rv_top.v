@@ -1,5 +1,5 @@
 module minsoc_rv_top
-  #(parameter MEM_SIZE = 32'h02000000,
+  #(parameter MEM_SIZE = 32'h00020000,
     parameter IBEX = 1'b1,
     parameter memfile = ""
    )

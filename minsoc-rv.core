@@ -79,7 +79,7 @@ targets:
       - files_constraints
     tools:
       vivado:
-        part: xc7a100csg324-2
+        part: xc7a100tcsg324-2
     parameters:
       - memfile
 
