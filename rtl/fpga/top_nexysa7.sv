@@ -24,7 +24,7 @@ module top_nexysa7 #(
     .memfile(memfile)
   ) u_minsoc_rv_top (
 		.wb_clk_i(clk_sys),
-		.wb_rst_i(rst_sys_n),
+		.wb_rst_i(~rst_sys_n),
 		.tdo_pad_o(),
 		.tms_pad_i(1'b0),
 		.tck_pad_i(1'b0),
