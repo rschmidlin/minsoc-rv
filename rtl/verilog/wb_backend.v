@@ -8,6 +8,7 @@ module wb_backend (
     input  wire [3:0]  req_len,   // up to 16 beats
     input  wire        req_we,
     input  wire [31:0] req_wdata,
+    input wire [3:0]   req_be,
 
     output reg         busy,
 
@@ -28,23 +29,12 @@ module wb_backend (
 
     reg [3:0] beat_cnt;
     reg [31:0] addr;
-    reg [3:0] sel;
 
     reg [1:0] state;
 
     localparam IDLE = 2'h0;
     localparam RUN = 2'h1;
     localparam DONE = 2'h2;
-
-    always @(*) begin
-        case (wb_adr[1:0])
-            2'h0: sel = 4'b1111;
-            2'h1: sel = 4'b0010;
-            2'h2: sel = 4'b0110;
-            2'h3: sel = 4'b1000;
-            default: sel = 4'b0000;
-        endcase
-    end
 
     always @(posedge clk) begin
         if (rst) begin
@@ -68,7 +58,7 @@ module wb_backend (
                     wb_adr <= req_addr;
                     wb_dat_w <= req_wdata;
                     beat_cnt <= req_len;
-                    wb_sel <= sel;
+                    wb_sel <= req_be;
 
                     state <= RUN;
                 end
