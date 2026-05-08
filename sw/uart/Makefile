@@ -19,7 +19,8 @@ $(TARGET).elf: firmware.c link.ld
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ firmware.c
 
 $(TARGET).bin: $(TARGET).elf
-	$(OBJCOPY) -O verilog $< $@
+	$(OBJCOPY) -O verilog $< $@_tmp
+	python3 byte2wordbin.py $@_tmp $@
 
 $(TARGET).dis: $(TARGET).elf
 	$(OBJDUMP) -d $< > $@
