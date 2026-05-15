@@ -100,6 +100,13 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
     assign hartinfo[i] = DebugHartInfo;
   end
 
+  reg ndmreset_q;
+
+  always @(posedge clk_i)
+  begin
+    ndmreset_q <= ndmreset;
+  end
+
 dm_top #(
   .NrHarts(NrHarts),
   .BusWidth(BusWidth),
@@ -121,7 +128,7 @@ dm_top #(
   .next_dm_addr_i(next_dm_addr_i),
   .testmode_i(testmode_i),
   .ndmreset_o(ndmreset_o),  // non-debug module reset
-  .ndmreset_ack_i(ndmreset_ack_i), // non-debug module reset acknowledgement pulse
+  .ndmreset_ack_i(ndmreset_q), // non-debug module reset acknowledgement pulse
   .dmactive_o(dmactive_o),  // debug module is active
   .debug_req_o(debug_req_o), // async debug request
   // communicate whether the hart is unavailable (e.g.: power down)

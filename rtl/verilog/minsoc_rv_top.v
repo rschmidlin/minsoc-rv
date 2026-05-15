@@ -204,10 +204,9 @@ minsoc_riscv_dbg #(
     ) riscv_dbg(
     .clk_i(wb_clk),
     .rst_ni(~wb_rst),
-    .next_dm_addr_i(),
+    .next_dm_addr_i(32'h0000_0000),
     .testmode_i(1'b0),
     .ndmreset_o(ndmreset_req),
-    .ndmreset_ack_i(),
     .dmactive_o(),
     .debug_req_o(dm_debug_req),
     .unavailable_i(1'b0),
