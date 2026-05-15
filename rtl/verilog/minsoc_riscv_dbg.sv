@@ -1,6 +1,7 @@
 
 module minsoc_riscv_dbg import dm_pkg::*; #(
   parameter int unsigned        NrHarts          = 1,
+  parameter logic [31:0] IdcodeValue = 32'h 0000_0001,
   parameter int unsigned        BusWidth         = 32,
   parameter int unsigned        DmBaseAddress    = 'h1000, // default to non-zero page
   // Bitmask to select physically available harts for systems
@@ -18,7 +19,6 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
     output logic                    dmactive_o,
     output logic [NrHarts-1:0]      debug_req_o,
     input logic [NrHarts-1:0]       unavailable_i,
-    input dm::hartinfo_t [NrHarts-1:0] hartinfo_i,
 
     // Wishbone Slave Interface
 	input logic                     slave_wb_cyc_i,
@@ -40,17 +40,13 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
 	input  logic                   master_wb_ack_i,
 	input  logic [BusWidth-1:0]    master_wb_dat_r_i,
 	input  logic                   master_wb_err_i,
-	output logic [BusWidth/8-1:0]  master_wb_sel_o,
+	output logic [BusWidth/8-1:0]  master_wb_sel_o
 
-    // Connection to DTM
-    input logic                     dmi_rst_ni,
-    input logic                     dmi_req_valid_i,
-    output logic                    dmi_req_ready_o,
-    input dm::dmi_req_t             dmi_req_i,
-
-    ouput logic                     dmi_req_valid_o,
-    input logic                     dmi_req_ready_i,
-    output dm::dmi_resp_t           dmi_resp_o
+    input  logic        tck_i,    // JTAG test clock pad
+    input  logic        tms_i,    // JTAG test mode select pad
+    input  logic        trst_ni,  // JTAG test reset pad
+    input  logic        td_i,     // JTAG test data input pad
+    output logic        td_o      // JTAG test data output pad
 )
 
 	// Master backend adapter signals
@@ -84,6 +80,26 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
 	wire        slave_resp_valid;
 	wire [31:0] slave_resp_rdata;
 
+    // DTM wiring
+    dm::dmi_req_t  dmi_req;
+    dm::dmi_resp_t dmi_rsp;
+    logic dmi_req_valid, dmi_req_ready;
+    logic dmi_rsp_valid, dmi_rsp_ready;
+    logic dmi_rst_n;
+
+  // static debug hartinfo
+  localparam dm::hartinfo_t DebugHartInfo = '{
+    zero1:      '0,
+    nscratch:   2, // Debug module needs at least two scratch regs
+    zero0:      0,
+    dataaccess: 1'b1, // data registers are memory mapped in the debugger
+    datasize:   dm::DataCount,
+    dataaddr:   dm::DataAddr
+  };
+  for (genvar i = 0; i < NrHarts; i++) begin : gen_dm_hart_ctrl
+    assign hartinfo[i] = DebugHartInfo;
+  end
+
 dm_top #(
   .NrHarts(NrHarts),
   .BusWidth(BusWidth),
@@ -110,7 +126,7 @@ dm_top #(
   .debug_req_o(debug_req_o), // async debug request
   // communicate whether the hart is unavailable (e.g.: power down)
   .unavailable_i(unavailable_i),
-  .hartinfo_i(hartinfo_i),
+  .hartinfo_i(hartinfo),
 
   .slave_req_i(slave_req_valid),
   .slave_we_i(slave_req_we),
@@ -131,17 +147,45 @@ dm_top #(
   .master_r_rdata_i(master_resp_rdata),
 
   // Connection to DTM - compatible to RocketChip Debug Module
-  .dmi_rst_ni(dmi_rst_ni), // Synchronous clear request from
+  .dmi_rst_ni(dmi_rst_n), // Synchronous clear request from
                                             // the DTM to clear the DMI response
                                             // FIFO.
-  .dmi_req_valid_i(dmi_req_valid_i),
-  .dmi_req_ready_o(dmi_req_ready_o),
-  .dmi_req_i(dmi_req_i),
+  .dmi_req_valid_i(dmi_req_valid),
+  .dmi_req_ready_o(dmi_req_ready),
+  .dmi_req_i(dmi_req),
 
-  .dmi_resp_valid_o(dmi_resp_valid_o),
-  .dmi_resp_ready_i(dmi_resp_ready_i),
+  .dmi_resp_valid_o(dmi_resp_valid),
+  .dmi_resp_ready_i(dmi_resp_ready),
   .dmi_resp_o(dmi_resp_o)
 );
+
+
+  // JTAG TAP
+  dmi_jtag #(
+    .IdcodeValue ( IdcodeValue )
+  ) dap (
+    .clk_i            (clk_i        ),
+    .rst_ni           (rst_ni       ),
+    .testmode_i       (testmode_i   ),
+    .test_rst_ni      (1'b1         ),
+
+    .dmi_rst_no       (dmi_rst_n    ),
+    .dmi_req_o        (dmi_req      ),
+    .dmi_req_valid_o  (dmi_req_valid),
+    .dmi_req_ready_i  (dmi_req_ready),
+
+    .dmi_resp_i       (dmi_rsp      ),
+    .dmi_resp_ready_o (dmi_rsp_ready),
+    .dmi_resp_valid_i (dmi_rsp_valid),
+
+    //JTAG
+    .tck_i,
+    .tms_i,
+    .trst_ni,
+    .td_i,
+    .td_o,
+    .tdo_oe_o ()
+  );
 
 assign master_gnt = ~master_busy;
 assign master_rerror = master_wb_err_i;
