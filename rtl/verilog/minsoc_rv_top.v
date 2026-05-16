@@ -1,5 +1,5 @@
 module minsoc_rv_top
-  #(parameter MEM_SIZE = 32'h02000000,
+  #(parameter MEM_SIZE = 32'h00001000,
     parameter IBEX = 1'b1
    )
 (
@@ -211,7 +211,7 @@ begin
    ndmreset_q <= ndmreset_req;
 end
 
-
+/*
 minsoc_riscv_dbg #(
       .NrHarts      ( 1 )
     ) riscv_dbg(
@@ -252,5 +252,5 @@ minsoc_riscv_dbg #(
     .trst_ni(1'b1),
     .td_i(1'b0),
     .td_o()
-);
+);*/
 endmodule
