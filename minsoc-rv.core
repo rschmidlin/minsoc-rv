@@ -9,6 +9,8 @@ filesets:
       - rtl/verilog/minsoc_rv_top.v
       - rtl/verilog/wb_backend.v
       - rtl/verilog/ibex_wb.sv
+      - rtl/verilog/minsoc_riscv_dbg.sv
+      - rtl/verilog/ibex_backend.v
     file_type: verilogSource
     depend:
       - "lowrisc:ibex:ibex_top"
@@ -91,10 +93,16 @@ generate:
           slaves:
             - mem
             - uart
+        dbgm:
+          slaves:
+            - mem
       slaves:
+        dbgs:
+          offset: 0x1A110000 # std conf Ibex
+          size: 0x10000 # 64 kbytes
         mem:
           offset : 0
-          size : 0x2000000
+          size : 0x10000 # 64 kbytes
         uart:
           datawidth : 8
           offset : 0x90000000

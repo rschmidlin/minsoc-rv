@@ -1,13 +1,13 @@
 /* Linker script for minsoc-rv (PicoRV32)
  *
  * Memory map from minsoc-rv.core:
- *   mem:  0x00000080, size 0x02000000 (32 MB)
+ *   mem:  0x00000080, size 0x000010000 (64 KB)
  *   uart: 0x90000000, size 8
  */
 
 MEMORY {
     /* Reserve 32k for stack at the top */
-    ram : ORIGIN = 0x00000080, LENGTH = 0x01FF8000
+    ram : ORIGIN = 0x00000080, LENGTH = 0x00008000
 }
 
 SECTIONS {

@@ -15,6 +15,7 @@ module minsoc_rv_top
 
 localparam wb_aw = 32;
 localparam wb_dw = 32;
+localparam debug_start_address = 32'h1A110000;
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -147,7 +148,11 @@ uart_top #(
    ibex_wb #(
       .PMPEnable(1'b0),
       .PMPGranularity(0),
-      .PMPNumRegions(4)
+      .PMPNumRegions(4),
+      .DbgTriggerEn    ( 1'b1 ),
+      .DbgHwBreakNum   ( 2    ),
+      .DmHaltAddr      ( debug_start_address + dm::HaltAddress[31:0]     ),
+      .DmExceptionAddr ( debug_start_address + dm::ExceptionAddress[31:0])
 )
    u_ibex (
          .clk_i(wb_clk),
@@ -199,6 +204,14 @@ uart_top #(
          );
 
 
+reg ndmreset_q;
+
+always @(posedge wb_clk_i)
+begin
+   ndmreset_q <= ndmreset_req;
+end
+
+
 minsoc_riscv_dbg #(
       .NrHarts      ( 1 )
     ) riscv_dbg(
@@ -207,36 +220,37 @@ minsoc_riscv_dbg #(
     .next_dm_addr_i(32'h0000_0000),
     .testmode_i(1'b0),
     .ndmreset_o(ndmreset_req),
+    .ndmreset_ack_i(ndmreset_q),
     .dmactive_o(),
     .debug_req_o(dm_debug_req),
     .unavailable_i(1'b0),
 
     // Wishbone Slave Interface
-	 .slave_wb_cyc_i(dbgs_m2s_wb_cyc),
-	 .slave_wb_stb_i(dbgs_m2s_wb_stb),
-	 .slave_wb_we_i(dbgs_m2s_wb_we),
-	 .slave_wb_adr_i(dbgs_m2s_wb_adr),
-	 .slave_wb_dat_w_i(dbgs_m2s_wb_dat),
-	 .slave_wb_ack_o(dbgs_s2m_wb_ack),
-	 .slave_wb_dat_r_o(dbgs_s2m_wb_dat),
-	 .slave_wb_err_o(dbgs_s2m_wb_err),
-	 .slave_wb_sel_i(dbgs_m2s_wb_sel)
+	 .slave_wb_cyc_i(wb_m2s_dbgs_cyc),
+	 .slave_wb_stb_i(wb_m2s_dbgs_stb),
+	 .slave_wb_we_i(wb_m2s_dbgs_we),
+	 .slave_wb_adr_i(wb_m2s_dbgs_adr),
+	 .slave_wb_dat_w_i(wb_m2s_dbgs_dat),
+	 .slave_wb_ack_o(wb_s2m_dbgs_ack),
+	 .slave_wb_dat_r_o(wb_s2m_dbgs_dat),
+	 .slave_wb_err_o(wb_s2m_dbgs_err),
+	 .slave_wb_sel_i(wb_m2s_dbgs_sel),
 
     // Wishbone Master Interface
-    .master_wb_cyc_o(dbgm_m2s_wb_cyc),
-    .master_wb_stb_o(dbgm_m2s_wb_stb),
-    .master_wb_we_o(dbgm_m2s_wb_we),
-    .master_wb_adr_o(dbgm_m2s_wb_adr),
-    .master_wb_dat_w_o(dbgm_m2s_wb_dat),
-    .master_wb_ack_i(dbgm_s2m_wb_ack),
-    .master_wb_dat_r_i(dbgm_s2m_wb_dat),
-    .master_wb_err_i(dbgm_s2m_wb_err),
-    .master_wb_sel_o(dbgm_m2s_wb_sel),
+    .master_wb_cyc_o(wb_m2s_dbgm_cyc),
+    .master_wb_stb_o(wb_m2s_dbgm_stb),
+    .master_wb_we_o(wb_m2s_dbgm_we),
+    .master_wb_adr_o(wb_m2s_dbgm_adr),
+    .master_wb_dat_w_o(wb_m2s_dbgm_dat),
+    .master_wb_ack_i(wb_s2m_dbgm_ack),
+    .master_wb_dat_r_i(wb_s2m_dbgm_dat),
+    .master_wb_err_i(wb_s2m_dbgm_err),
+    .master_wb_sel_o(wb_m2s_dbgm_sel),
 
-    .tck_i,
-    .tms_i,
-    .trst_ni,
-    .td_i,
-    .td_o
+    .tck_i(1'b0),
+    .tms_i(1'b0),
+    .trst_ni(1'b1),
+    .td_i(1'b0),
+    .td_o()
 );
 endmodule

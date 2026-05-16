@@ -27,3 +27,10 @@ By calling the following command after compiling sw/firmware, you can see Hello 
 Alternatively using Verilator
 
 ```fusesoc run --target sim --tool verilator minsoc-rv --elf_load ./minsoc-rv/sw/uart/firmware.elf --vcd testbench.vcd```
+
+
+Current development: debugger mimics memory to CPU in order to debug. To do so, Ibex parameter for address to jump to in debug must be set and it must match the slave address of the debug unit in core file for the Wishbone generator
+
+Adaptations to riscv-dbg:
+    - applied 0001-User-lowrisc-instead-of-PULP-primitives.patch to vendor/riscv-dbg
+    - substituted fifo_v3 of dm_csrs.sv by prim_fifo_sync

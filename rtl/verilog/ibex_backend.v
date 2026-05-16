@@ -11,7 +11,7 @@ module ibex_backend (
     input reg [31:0]  wb_dat_w,
     output  wire        wb_ack,
     output  wire [31:0] wb_dat_r,
-    input wire [3:0]  wb_sel
+    input wire [3:0]  wb_sel,
 
     // Request
     output wire        req_valid,
@@ -23,7 +23,7 @@ module ibex_backend (
 
     // Response
     input reg         resp_valid,
-    input reg [31:0]  resp_rdata,
+    input reg [31:0]  resp_rdata
 );
 
 // Identify Wishbone requests 
@@ -36,3 +36,5 @@ assign req_be = wb_sel;
 
 assign wb_ack = resp_valid;
 assign wb_dat_r = resp_rdata;
+
+endmodule

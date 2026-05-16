@@ -19,6 +19,7 @@ filesets:
       - vendor/riscv-dbg/src/dm_mem.sv
       - vendor/riscv-dbg/src/dmi_cdc.sv
       - vendor/riscv-dbg/src/dmi_jtag.sv
+      - vendor/riscv-dbg/src/dm_top.sv
       - vendor/ibex/vendor/lowrisc_ip/ip/prim/rtl/prim_sync_reqack.sv
     file_type: systemVerilogSource
 

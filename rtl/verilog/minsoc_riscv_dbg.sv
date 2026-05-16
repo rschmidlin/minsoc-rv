@@ -1,5 +1,5 @@
 
-module minsoc_riscv_dbg import dm_pkg::*; #(
+module minsoc_riscv_dbg #(
   parameter int unsigned        NrHarts          = 1,
   parameter logic [31:0] IdcodeValue = 32'h 0000_0001,
   parameter int unsigned        BusWidth         = 32,
@@ -29,7 +29,7 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
 	output  logic                   slave_wb_ack_o,
 	output  logic [BusWidth-1:0]    slave_wb_dat_r_o,
 	output  logic                   slave_wb_err_o,
-	input logic [BusWidth/8-1:0]    slave_wb_sel_i
+	input logic [BusWidth/8-1:0]    slave_wb_sel_i,
 
     // Wishbone Master Interface
 	output logic                   master_wb_cyc_o,
@@ -40,17 +40,18 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
 	input  logic                   master_wb_ack_i,
 	input  logic [BusWidth-1:0]    master_wb_dat_r_i,
 	input  logic                   master_wb_err_i,
-	output logic [BusWidth/8-1:0]  master_wb_sel_o
+	output logic [BusWidth/8-1:0]  master_wb_sel_o,
 
     input  logic        tck_i,    // JTAG test clock pad
     input  logic        tms_i,    // JTAG test mode select pad
     input  logic        trst_ni,  // JTAG test reset pad
     input  logic        td_i,     // JTAG test data input pad
     output logic        td_o      // JTAG test data output pad
-)
+);
 
 	// Master backend adapter signals
-	wire        master_req_valid;
+	wire        master_req;
+  wire        master_req_valid;
 	wire [31:0] master_req_addr;
 	wire [ 3:0] master_req_len;
 	wire        master_req_we;
@@ -96,15 +97,11 @@ module minsoc_riscv_dbg import dm_pkg::*; #(
     datasize:   dm::DataCount,
     dataaddr:   dm::DataAddr
   };
+
+  dm::hartinfo_t [NrHarts-1:0]      hartinfo;
+
   for (genvar i = 0; i < NrHarts; i++) begin : gen_dm_hart_ctrl
     assign hartinfo[i] = DebugHartInfo;
-  end
-
-  reg ndmreset_q;
-
-  always @(posedge clk_i)
-  begin
-    ndmreset_q <= ndmreset;
   end
 
 dm_top #(
@@ -197,12 +194,8 @@ dm_top #(
 assign master_gnt = ~master_busy;
 assign master_rerror = master_wb_err_i;
 
-assign master_req_valid = master_req;
-assign master_req_addr = master_addr;
-assign master_req_we = master_we;
-assign master_req_wdata = master_wdata;
 assign master_req_len = 4'h1;  // Single beat
-assign master_wb_sel = master_be;
+assign master_wb_sel_o = master_be;
 
 /*
  * Host Wishbone backend adapter
@@ -249,7 +242,7 @@ ibex_backend slave_ibex_backend (
     .wb_dat_w(slave_wb_dat_w_i),
     .wb_ack(slave_wb_ack_o),
     .wb_dat_r(slave_wb_dat_r_o),
-    .wb_sel(slave_wb_sel_i)
+    .wb_sel(slave_wb_sel_i),
 
     // Request
     .req_valid(slave_req_valid),
@@ -261,5 +254,7 @@ ibex_backend slave_ibex_backend (
 
     // Response
     .resp_valid(slave_resp_valid),
-    .resp_rdata(slave_resp_rdata),
-)
+    .resp_rdata(slave_resp_rdata)
+);
+
+endmodule
