@@ -213,7 +213,8 @@ end
 
 
 minsoc_riscv_dbg #(
-      .NrHarts      ( 1 )
+      .NrHarts      ( 1 ),
+      .IdcodeValue  ( 32'h11001cdf )
     ) riscv_dbg(
     .clk_i(wb_clk),
     .rst_ni(~wb_rst),
@@ -247,11 +248,11 @@ minsoc_riscv_dbg #(
     .master_wb_err_i(wb_s2m_dbgm_err),
     .master_wb_sel_o(wb_m2s_dbgm_sel),
 
-    .tck_i(1'b0),
-    .tms_i(1'b0),
-    .trst_ni(1'b1),
-    .td_i(1'b0),
-    .td_o()
+    .tck_i(tck_pad_i),
+    .tms_i(tms_pad_i),
+    .trst_ni(~wb_rst),
+    .td_i(tdi_pad_i),
+    .td_o(tdo_pad_o)
 );
 
 endmodule

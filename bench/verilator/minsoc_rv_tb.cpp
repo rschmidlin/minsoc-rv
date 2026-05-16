@@ -179,7 +179,7 @@ int main(int argc, char **argv, char **env)
 		tbUtils->doJTAG(&top->tms_pad_i, &top->tdi_pad_i, &top->tck_pad_i, top->tdo_pad_o);
 
         int byte = uart_decoder_step(top, tbUtils);
-        if (byte == '\n') {
+        if (byte == '\n' && !tbUtils->getJtagEnable()) {
             done = true;
         }
 	}

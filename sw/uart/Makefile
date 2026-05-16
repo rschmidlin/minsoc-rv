@@ -6,7 +6,7 @@ SIZE     = $(CROSS)size
 
 ARCH     = -march=rv32i -mabi=ilp32
 
-CFLAGS   = $(ARCH) -Os -Wall -ffreestanding -nostdlib
+CFLAGS   = $(ARCH) -O0 -g -Wall -ffreestanding -nostdlib
 LDFLAGS  = $(ARCH) -T link.ld -nostartfiles -nostdlib -lgcc
 
 TARGET   = firmware

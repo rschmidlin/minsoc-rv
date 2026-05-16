@@ -158,9 +158,9 @@ dm_top #(
   .dmi_req_ready_o(dmi_req_ready),
   .dmi_req_i(dmi_req),
 
-  .dmi_resp_valid_o(dmi_resp_valid),
-  .dmi_resp_ready_i(dmi_resp_ready),
-  .dmi_resp_o(dmi_resp_o)
+  .dmi_resp_valid_o(dmi_rsp_valid),
+  .dmi_resp_ready_i(dmi_rsp_ready),
+  .dmi_resp_o(dmi_rsp)
 );
 
 
