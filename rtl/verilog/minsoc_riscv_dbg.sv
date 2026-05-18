@@ -195,7 +195,6 @@ assign master_gnt = ~master_busy;
 assign master_rerror = master_wb_err_i;
 
 assign master_req_len = 4'h1;  // Single beat
-assign master_wb_sel_o = master_be;
 
 /*
  * Host Wishbone backend adapter
@@ -209,6 +208,7 @@ wb_backend master_wb_backend (
     .req_len(master_req_len),
     .req_we(master_req_we),
     .req_wdata(master_req_wdata),
+		.req_be(master_be),
     .busy(master_busy),
     .resp_valid(master_resp_valid),
     .resp_rdata(master_resp_rdata),
