@@ -77,7 +77,7 @@ static int parse_args(int argc, char **argv, VerilatorTbUtils* tbUtils)
 	return argp_parse(&argp, argc, argv, 0, 0, tbUtils);
 }
 
-#define UART_TX_WAIT (864*2)
+#define UART_TX_WAIT (864)
 
 int uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
 {

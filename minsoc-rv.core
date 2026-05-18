@@ -16,7 +16,7 @@ filesets:
       - "lowrisc:ibex:ibex_top"
       - "pulp:riscv:debug_module"
       - ">=uart16550-1.5.4"
-      - ">=wb_ram-1.0"
+      - "=wb_ram-1.1-r2026"
   verilog_tb_files:
     files:
       - bench/verilog/minsoc_rv_tb.v: {file_type: verilogSource}
@@ -34,8 +34,16 @@ filesets:
     depend: 
       - ~wb_intercon-1.2
   xilinx_files:
+    files:
+      - rtl/fpga/top_nexysa7.sv
+    file_type: systemVerilogSource
     depend:
       - "lowrisc:prim_xilinx:all"
+      - "lowrisc:ibex:fpga_xilinx_shared"
+  files_constraints:
+    files:
+      - data/pins_nexysa7.xdc
+    file_type: xdc
 
 targets:
   default: &default
@@ -43,13 +51,13 @@ targets:
     filesets:
       - soc_files
       - wb_intercon_dep
-      - "!tool_verilator ? (verilog_tb_files)"
+      - "tool_icarus ? (verilog_tb_files)"
       - "tool_verilator ? (verilator_tb_files)"
       - "tool_vivado ? (xilinx_files)"
     toplevel: 
-      - "!tool_verilator ? (minsoc_rv_tb)"
+      - "tool_icarus ? (minsoc_rv_tb)"
       - "tool_verilator ? (minsoc_rv_top)"
-      - "tool_vivado ? (minsoc_rv_top)"
+      - "tool_vivado ? (top_nexysa7)"
     generate:
       - wb_intercon
     tools:
@@ -64,21 +72,31 @@ targets:
     description: Simulate the design
     parameters:
       - clear_ram
+      - memfile
 
   synth:
     <<: *default
     description: Synthesize the design for a Nexys Video FPGA board
     default_tool: vivado
-    #filesets_append: []
+    filesets_append: 
+      - files_constraints
     tools:
       vivado:
-        part: xc7a200tsbg484-1
+        part: xc7a100tcsg324-2
+    parameters:
+      - memfile
 
 parameters:
   clear_ram:
     datatype   : bool
     description: Preset RAM to a known value (0)
     paramtype  : plusarg
+    scope      : private
+
+  memfile:
+    datatype   : str
+    description: File to preload the block RAM with - must be vmem hex format
+    paramtype  : vlogparam
     scope      : private
 
 generate:

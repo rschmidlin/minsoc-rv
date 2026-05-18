@@ -77,7 +77,7 @@ void _start(void)
  * With SIM=1 the UART IP divides by 1, so this value is
  * mostly symbolic; the monitor samples at the configured rate.
  */
-#define SYS_CLK       100000000
+#define SYS_CLK       50000000
 #define UART_BAUDRATE 115200
 
 /* ------------------------------------------------------------------ */

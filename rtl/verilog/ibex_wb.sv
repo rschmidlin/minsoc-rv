@@ -290,7 +290,6 @@ module ibex_wb import ibex_pkg::*; #(
 	assign instr_req_we = 1'b0;      // Instructions are always reads
 	assign instr_req_wdata = 32'b0;
 	assign instr_req_len = 4'h1;     // Single beat
-	assign instr_wb_sel = 4'hF;     // Always select all bytes for instruction fetches
 
 	/*
 	 * Data Memory Interface to Request/Response Adapter
@@ -309,7 +308,6 @@ module ibex_wb import ibex_pkg::*; #(
 	assign data_req_we = data_we;
 	assign data_req_wdata = data_wdata;
 	assign data_req_len = 4'h1;  // Single beat
-	assign data_wb_sel = data_be;
 
 	/*
 	 * Instruction Wishbone Backend Adapter Instance
@@ -322,6 +320,7 @@ module ibex_wb import ibex_pkg::*; #(
 		.req_len(instr_req_len),
 		.req_we(instr_req_we),
 		.req_wdata(instr_req_wdata),
+		.req_be(4'hF),
 		.busy(instr_busy),
 		.resp_valid(instr_resp_valid),
 		.resp_rdata(instr_resp_rdata),
@@ -346,6 +345,7 @@ module ibex_wb import ibex_pkg::*; #(
 		.req_len(data_req_len),
 		.req_we(data_req_we),
 		.req_wdata(data_req_wdata),
+		.req_be(data_be),
 		.busy(data_resp_busy),
 		.resp_valid(data_resp_valid),
 		.resp_rdata(data_resp_rdata),
