@@ -6,7 +6,7 @@ description: "Minimal System-on-Chip RISC-V"
 filesets:
   soc_files:
     files:
-      - rtl/verilog/minsoc_rv_top.v
+      - rtl/verilog/minsoc_rv_top.sv
       - rtl/verilog/wb_backend.v
       - rtl/verilog/ibex_wb.sv
       - rtl/verilog/minsoc_riscv_dbg.sv
