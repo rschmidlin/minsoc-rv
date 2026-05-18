@@ -181,7 +181,7 @@ uart_top #(
          .data_wb_sel(wb_m2s_ibexd_sel), // byte enables for data bus only
 
 // Configuration
-         .hart_id_i(32'hdeadbeef),
+         .hart_id_i(32'h00000000),
          .boot_addr_i(32'h00000000),
 
 // Interrupt inputs

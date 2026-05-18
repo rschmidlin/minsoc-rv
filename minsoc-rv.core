@@ -89,9 +89,11 @@ generate:
         ibexi:
           slaves:
             - mem
+            - dbgs
         ibexd:
           slaves:
             - mem
+            - dbgs
             - uart
         dbgm:
           slaves:

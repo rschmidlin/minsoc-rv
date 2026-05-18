@@ -227,6 +227,25 @@ wb_backend master_wb_backend (
 assign slave_wb_err_o = 1'b0; // no error for now
 assign slave_req_len = 4'h1;
 
+wire [31:0] dbgs_data_r;
+reg wb_req;
+
+always @(posedge clk_i) begin
+  if (!rst_ni) begin
+    slave_wb_ack_o   <= 1'b0;
+    slave_wb_dat_r_o <= 32'h0;
+    wb_req <= 1'b0;
+  end else begin
+    wb_req <= slave_wb_cyc_i & slave_wb_stb_i;
+    slave_wb_ack_o <= wb_req;
+
+    if (slave_wb_cyc_i & slave_wb_stb_i) begin
+      slave_wb_dat_r_o <= dbgs_data_r;
+    end
+  end
+end
+
+
 /*
  * Slave Ibex adapter
  */ 
@@ -240,8 +259,8 @@ ibex_backend slave_ibex_backend (
     .wb_we(slave_wb_we_i),
     .wb_adr(slave_wb_adr_i),
     .wb_dat_w(slave_wb_dat_w_i),
-    .wb_ack(slave_wb_ack_o),
-    .wb_dat_r(slave_wb_dat_r_o),
+    .wb_ack(),
+    .wb_dat_r(dbgs_data_r),
     .wb_sel(slave_wb_sel_i),
 
     // Request
