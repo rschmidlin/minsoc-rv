@@ -31,5 +31,5 @@ SECTIONS {
         __bss_end = .;
     } > ram
 
-    _stack_top = 0x02000000;
+    _stack_top = 0x000010000;
 }
