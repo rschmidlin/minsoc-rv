@@ -41,5 +41,6 @@ Next steps:
     2) Timer
     3) Cache
     4) Set license
-    5) Clean-up unused wires and file formatting
-    6) Axi-Adapter
+    5) Re-organize base addresses
+    6) Clean-up unused wires and file formatting
+    7) Axi-Adapter
