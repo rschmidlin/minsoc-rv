@@ -35,3 +35,9 @@ Current development: debugger mimics memory to CPU in order to debug. To do so, 
 Adaptations to riscv-dbg:
     - applied 0001-User-lowrisc-instead-of-PULP-primitives.patch to vendor/riscv-dbg
     - substituted fifo_v3 of dm_csrs.sv by prim_fifo_sync
+
+Next steps:
+    1) Interruptfähigkeit
+    4) Timer
+    3) Cache
+    2) Axi-Adapter
