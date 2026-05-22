@@ -40,4 +40,6 @@ Next steps:
     1) Interruptfähigkeit
     2) Timer
     3) Cache
-    4) Axi-Adapter
+    4) Set license
+    5) Clean-up unused wires and file formatting
+    6) Axi-Adapter
