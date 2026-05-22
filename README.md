@@ -38,6 +38,6 @@ Adaptations to riscv-dbg:
 
 Next steps:
     1) Interruptfähigkeit
-    4) Timer
+    2) Timer
     3) Cache
-    2) Axi-Adapter
+    4) Axi-Adapter
