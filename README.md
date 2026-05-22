@@ -39,8 +39,9 @@ Adaptations to riscv-dbg:
 Next steps:
     1) [X] Interruptfähigkeit
     2) [ ] Timer
-    3) [ ] Cache
-    4) [ ] Set license
-    5) [ ] Re-organize base addresses
-    6) [ ] Clean-up unused wires and file formatting
+    3) [ ] Set license
+    4) [ ] Re-organize base addresses
+    5) [ ] Clean-up unused wires and file formatting
+    6) [ ] Cache
     7) [ ] Axi-Adapter
+    8) [ ] Build with Yosys? 
