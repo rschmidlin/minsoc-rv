@@ -46,7 +46,7 @@ void uart_init(unsigned long base)
 	REG8(uart_base + UART_FCR) = UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT | UART_FCR_TRIGGER_1;
 
 	/* Enable RX interrupt */
-	REG8(uart_base + UART_IER) = UART_IER_RDI | UART_IER_THRI;
+	REG8(uart_base + UART_IER) = UART_IER_RDI;
 
 	/* Set 8 bit char, 1 stop bit, no parity */
 	REG8(uart_base + UART_LCR) = UART_LCR_WLEN8 & ~(UART_LCR_STOP | UART_LCR_PARITY);

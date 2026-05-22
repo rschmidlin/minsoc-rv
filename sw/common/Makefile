@@ -6,9 +6,9 @@ SIZE     = $(CROSS)size
 AR		 = $(CROSS)ar
 RANLIB	 = $(CROSS)ranlib
 
-ARCH     = -march=rv32g -mabi=ilp32
+ARCH     = -march=rv32imc_zicsr_zifencei -mabi=ilp32
 
-CFLAGS   = $(ARCH) -O0 -g -Wall -ffreestanding -nostdlib
+CFLAGS   = $(ARCH) -mcmodel=medany -Wall -fvisibility=hidden -ffreestanding -O0 -g -Wall -ffreestanding -nostdlib
 LDFLAGS  = $(ARCH) -T link.ld -nostartfiles -nostdlib -lgcc
 
 TARGET   = libcommon.a
@@ -27,7 +27,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(INCLUDESPATH) -c $< -o $@
 
 %.o: %.S
-	$(CC) $(CFLAGS) $(INCLUDESPATH) -c $< -o $@
+	$(CC) $(ARCH) $(INCLUDESPATH) -c $< -o $@
 
 clean:
 	rm -f $(TARGET) $(OBJS)

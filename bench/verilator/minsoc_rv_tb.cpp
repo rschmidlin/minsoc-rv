@@ -33,7 +33,7 @@ static bool done;
 #define NOP_OR1KSIM		0x000b      /* Return non-zero if this is Or1ksim */
 #define NOP_EXIT_SILENT		0x000c      /* End of simulation, quiet version */
 
-#define RESET_TIME		2
+#define RESET_TIME		10
 
 vluint64_t main_time = 0;       // Current simulation time
 // This is a 64-bit integer to reduce wrap over issues and
@@ -148,10 +148,62 @@ int uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     return -1;
 }
 
+int uart_transmit_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
+{
+    static unsigned int state = 0;
+    static uint64_t start_timestamp = 0;
+    static uint8_t byte = 'Y';
+    static uint64_t bit_timestamp = 0;
+    static uint8_t bitnr = 0;
+    uint64_t elapsed = 0;
+    static bool byte_sent = false;
+    if (!byte_sent) {
+        switch (state) {
+            case 0: // Set start bit
+                start_timestamp = tbUtils->getTime();
+                top->uart_srx_i = 0;
+                state = 1;
+                break;
+            case 1: // wait for start bit
+                if (tbUtils->getTime() - start_timestamp >= (UART_TX_WAIT))
+                {
+                    bit_timestamp = tbUtils->getTime();
+                    state = 2;
+                }
+                break;
+            case 2: // Send data bits
+                elapsed = tbUtils->getTime() - bit_timestamp;
+                top->uart_srx_i = (byte >> bitnr) & 1;
+                if (elapsed >= UART_TX_WAIT) {
+                    bitnr++;
+                    bit_timestamp = tbUtils->getTime();
+                    if (bitnr >= 7) {
+                        state = 3;
+                    }
+                }
+                break;
+            case 3: // wait for stop bit to finish
+                elapsed = tbUtils->getTime() - bit_timestamp;
+                top->uart_srx_i = 0;
+                if (elapsed >= UART_TX_WAIT) {
+                    state = 0;
+                    top->uart_srx_i = 1;
+                    byte_sent = true;
+                }
+                break;
+            default:
+                state = 0;
+                break;
+        }
+    }
+    return -1;
+}
+
 int main(int argc, char **argv, char **env)
 {
 	uint32_t insn = 0;
 	uint32_t ex_pc = 0;
+    bool line_finished = false;
 
 	Verilated::commandArgs(argc, argv);
 
@@ -164,13 +216,18 @@ int main(int argc, char **argv, char **env)
 	signal(SIGINT, INThandler);
 
 	top->wb_clk_i = 0;
-	top->wb_rst_i = 1;
+	top->wb_rst_i = 0;
+    top->uart_srx_i = 1;
 
 	top->trace(tbUtils->tfp, 99);
 
 	while (tbUtils->doCycle() && !done) {
-		if (tbUtils->getTime() > RESET_TIME)
-			top->wb_rst_i = 0;
+		if (tbUtils->getTime() > RESET_TIME && tbUtils->getTime() < 2*RESET_TIME)
+			top->wb_rst_i = 1;
+        else if (tbUtils->getTime() >= 2*RESET_TIME) {
+            top->wb_rst_i = 0;
+        }
+        
 
 		top->eval();
 
@@ -180,7 +237,13 @@ int main(int argc, char **argv, char **env)
 
         int byte = uart_decoder_step(top, tbUtils);
         if (byte == '\n' && !tbUtils->getJtagEnable()) {
-            done = true;
+            line_finished = true;
+        }
+        if (line_finished) {
+            uart_transmit_step(top, tbUtils);    
+            if (byte == 'Z') {
+                done = true;
+            }
         }
 	}
 

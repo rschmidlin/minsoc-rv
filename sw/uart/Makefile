@@ -4,7 +4,7 @@ OBJCOPY  = $(CROSS)objcopy
 OBJDUMP  = $(CROSS)objdump
 SIZE     = $(CROSS)size
 
-ARCH     = -march=rv32i -mabi=ilp32
+ARCH     = -march=rv32imc_zicsr_zifencei -mabi=ilp32 -mcmodel=medany -Wall -fvisibility=hidden -ffreestanding
 
 CFLAGS   = $(ARCH) -O0 -g -Wall -ffreestanding -nostdlib
 LDFLAGS  = $(ARCH) -T link.ld -nostartfiles -nostdlib -lgcc

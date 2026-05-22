@@ -9,7 +9,9 @@
 int main(void)
 {
     uart_init(UART_BASE);
-    //install_exception_handler(UART_IRQ_NUM, &uart_interrupt);
+    install_exception_handler(UART_IRQ_NUM, &uart_interrupt);
+    enable_interrupts(UART_IRQ);
+    set_global_interrupt_enable(1);
     uart_print_str("Hello World.\n");
 
     /* Spin forever */
