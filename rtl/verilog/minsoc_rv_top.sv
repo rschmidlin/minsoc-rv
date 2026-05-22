@@ -141,7 +141,7 @@ uart_top #(
    assign irq_timer_i = 1'b0;
    assign irq_external_i = 1'b0;
    assign irq_nm_i = 1'b0;
-   assign irq_fast_i = 15'h0000;
+   assign irq_fast_i = {14'h0000, uart_irq};
 
    assign debug_req_i = 1'b0;
 

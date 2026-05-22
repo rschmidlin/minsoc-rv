@@ -13,14 +13,19 @@ TARGET   = firmware
 
 .PHONY: all clean
 
+INCDIR 	 = ../common
+LIBDIR	 = ../common
+LIB 	 = common
+
 all: $(TARGET).elf $(TARGET).bin $(TARGET).dis
 
 $(TARGET).elf: firmware.c link.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ firmware.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -I$(INCDIR) -L$(LIBDIR) -o $@ firmware.c ../common/crt0.o -l$(LIB)
 
 $(TARGET).bin: $(TARGET).elf
 	$(OBJCOPY) -O verilog $< $@_tmp
-	python3 byte2wordbin.py $@_tmp $@
+	@python3 byte2wordbin.py $@_tmp $@
+	@rm $@_tmp
 
 $(TARGET).dis: $(TARGET).elf
 	$(OBJDUMP) -d $< > $@
@@ -29,4 +34,4 @@ size: $(TARGET).elf
 	$(SIZE) $<
 
 clean:
-	rm -f $(TARGET).elf $(TARGET).bin $(TARGET).dis
+	rm -f $(TARGET).elf $(TARGET).bin $(TARGET).dis $(TARGET).bin_tmp
