@@ -1,16 +1,10 @@
-/* Linker script for minsoc-rv (PicoRV32)
- *
- * Memory map from minsoc-rv.core:
- *   mem:  0x00000080, size 0x000010000 (64 KB)
- *   uart: 0x90000000, size 8
- */
 
 OUTPUT_ARCH(riscv)
 
 MEMORY {
     /* Reserve 32k for stack at the top */
-    ram : ORIGIN = 0x00000000, LENGTH = 0x00008000
-    stack : ORIGIN = 0x00008080, LENGTH = 0x02000 /*   4 KiB */
+    ram : ORIGIN = 0x00000000, LENGTH = 0xE000          /* 54 kB */
+    stack : ORIGIN = 0x0000E000, LENGTH = 0x2000       /* 8 KiB */
 }
 
 /* Stack information variables */
