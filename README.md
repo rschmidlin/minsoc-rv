@@ -37,10 +37,10 @@ Adaptations to riscv-dbg:
     - substituted fifo_v3 of dm_csrs.sv by prim_fifo_sync
 
 Next steps:
-    1) Interruptfähigkeit
-    2) Timer
-    3) Cache
-    4) Set license
-    5) Re-organize base addresses
-    6) Clean-up unused wires and file formatting
-    7) Axi-Adapter
+    1) [X] Interruptfähigkeit
+    2) [ ] Timer
+    3) [ ] Cache
+    4) [ ] Set license
+    5) [ ] Re-organize base addresses
+    6) [ ] Clean-up unused wires and file formatting
+    7) [ ] Axi-Adapter
