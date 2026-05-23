@@ -39,7 +39,7 @@ Adaptations to riscv-dbg:
 Next steps:
     1) [X] Interruptfähigkeit
     2) [X] Timer
-    3) [ ] Set license
+    3) [X] Set license
     4) [ ] Re-organize base addresses
     5) [ ] Clean-up unused wires and file formatting
     6) [ ] Cache
