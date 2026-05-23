@@ -110,6 +110,26 @@ uart_top #(
    assign wb_s2m_uart_err = 1'b0;
    assign wb_s2m_uart_rty = 1'b0;
 
+   //
+   // Timer
+   //
+   tc tc(
+      .clk(wb_clk_i),
+      .rst(wb_rst_i),
+      .wb_adr_i(wb_m2s_timer_adr[16:0]),
+      .wb_dat_i(wb_m2s_timer_dat),
+      .wb_sel_i(wb_m2s_timer_sel),
+      .wb_we_i(wb_m2s_timer_we),
+      .wb_cyc_i(wb_m2s_timer_cyc),
+      .wb_stb_i(wb_m2s_timer_stb),
+      .wb_cti_i(wb_m2s_timer_cti),
+      .wb_bte_i(wb_m2s_timer_bte),
+      .wb_dat_o(wb_s2m_timer_dat),
+      .wb_ack_o(wb_s2m_timer_ack),
+      .wb_err_o(wb_s2m_timer_err),
+      .wb_rty_o(wb_s2m_timer_rty)
+   );
+
 
    //
    // Ibex

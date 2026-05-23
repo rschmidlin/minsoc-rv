@@ -15,7 +15,7 @@ TARGET   = libcommon.a
 
 .PHONY: all clean
 
-OBJS = demo_system.o crt0.o uart.o
+OBJS = demo_system.o crt0.o uart.o timer.o
 
 all: $(TARGET)
 
