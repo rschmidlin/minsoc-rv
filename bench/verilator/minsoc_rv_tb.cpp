@@ -191,10 +191,16 @@ int uart_transmit_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     return -1;
 }
 
-bool instruction_detect_wfi(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils) 
+bool instruction_detect_wfi(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
 {
+    // WFI at 0xd2 and 0x14a are 2-byte aligned (RVC boundary) but not 4-byte aligned.
+    // The Wishbone bus fetches 32-bit words at 4-byte aligned addresses, so the
+    // word-aligned addresses containing these WFIs are 0xd0 and 0x148 respectively.
+    // The opcode 0x10500073 is split across two fetches; the lower 16 bits (0x0073)
+    // appear in dat_r[31:16] of the aligned fetch.
+
     if (top->minsoc_rv_top->ibexi_ack
-        && (top->minsoc_rv_top->ibexi_dat_r == WIF_OPCODE)) {
+        && ((top->minsoc_rv_top->ibexi_dat_r >> 16) == (WIF_OPCODE & 0xFFFF))) {
             return true;
     }
 
@@ -203,7 +209,6 @@ bool instruction_detect_wfi(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
 
 int main(int argc, char **argv, char **env)
 {
-    std::cout << "STARTING" << std::endl;
 	uint32_t insn = 0;
 	uint32_t ex_pc = 0;
     bool line_finished = false;
@@ -231,7 +236,6 @@ int main(int argc, char **argv, char **env)
         else if (tbUtils->getTime() >= 2*RESET_TIME) {
             top->wb_rst_i = 0;
         }
-        
 
 		top->eval();
 
@@ -248,9 +252,8 @@ int main(int argc, char **argv, char **env)
             }
         }
 
-        if (instruction_detect_wfi(top, tbUtils)) {
+        if (byte == 8) {
             send_character = true;
-            std::cout << "instr detected" << std::endl;
         }
 	}
 

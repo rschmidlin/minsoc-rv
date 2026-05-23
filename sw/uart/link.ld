@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Derived in part from ibex-demo-system
-//
-// Copyright lowRISC contributors
-// Copyright 2026 Raul Schmidlin
+/* SPDX-License-Identifier: Apache-2.0
+  
+   Derived in part from ibex-demo-system
+  
+   Copyright lowRISC contributors
+   Copyright 2026 Raul Schmidlin */
 
 OUTPUT_ARCH(riscv)
 

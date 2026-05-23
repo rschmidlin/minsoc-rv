@@ -36,6 +36,7 @@ wire wb_rst = wb_rst_i;
 // Public aliases for testbench access (/* verilator public */ required for Verilator 5.x)
 wire ibexi_ack     /* verilator public */ = wb_s2m_ibexi_ack;
 wire [31:0] ibexi_dat_r /* verilator public */ = wb_s2m_ibexi_dat;
+wire [31:0] ibexi_adr /* verilator public */ = wb_m2s_ibexi_adr;
 
 
 ////////////////////////////////////////////////////////////////////////

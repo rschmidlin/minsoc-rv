@@ -24,6 +24,7 @@ int main(void)
     puthex(end-start);
     putchar('\n');
     uart_print_str("Hello World.\n");
+    putchar(8);
 
     /* Spin forever */
     while (1) {
