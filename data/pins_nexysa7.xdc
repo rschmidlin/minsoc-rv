@@ -1,6 +1,6 @@
 ## Common constraints file for Nexys A7-50T and A7-100T.
 ## Based on https://github.com/Digilent/digilent-xdc/blob/master/Nexys-A7-100T-Master.xdc
-## and modified for Ibex
+## and modified for MinSoC-RV
 
 ## Clock signal
 set_property -dict { PACKAGE_PIN E3    IOSTANDARD LVCMOS33 } [get_ports { IO_CLK }]; #IO_L12P_T1_MRCC_35 Sch=gclk[100]

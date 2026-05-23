@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Copyright 2026 Raul Schmidlin
+
 #include "dev_access.h"
 #include "demo_system.h"
 #include "uart.h"

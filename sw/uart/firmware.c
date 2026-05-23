@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Copyright 2026 Raul Schmidlin
+
 #include "demo_system.h"
 #include "uart.h"
 #include "timer.h"
@@ -18,6 +22,7 @@ int main(void)
     unsigned int end = timer_get();
     uart_print_str("Init time elapsed in clock cycles: ");
     puthex(end-start);
+    putchar('\n');
     uart_print_str("Hello World.\n");
 
     /* Spin forever */

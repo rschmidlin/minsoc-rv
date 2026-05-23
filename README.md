@@ -45,3 +45,16 @@ Next steps:
     6) [ ] Cache
     7) [ ] Axi-Adapter
     8) [ ] Build with Yosys? 
+
+## Licensing
+
+This project is primarily licensed under Apache-2.0.
+
+Third-party components retain their original licenses:
+
+- Ibex: Apache-2.0
+- wb_intercon: ISC
+
+Simulation infrastructure includes GPL-derived components from mor1kx/orpsoc testbench code.
+
+See LICENSES/ for details.

@@ -1,6 +1,9 @@
-// Copyright lowRISC contributors.
-// Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Derived in part from ibex-demo-system
+//
+// Copyright lowRISC contributors
+// Copyright 2026 Raul Schmidlin
 
 #include "demo_system.h"
 

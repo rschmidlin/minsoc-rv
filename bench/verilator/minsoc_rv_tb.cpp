@@ -1,16 +1,19 @@
-/*
- * mor1kx-generic system Verilator testbench
- *
- * Author: Olof Kindgren <olof.kindgren@gmail.com>
- * Author: Franck Jullien <franck.jullien@gmail.com>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
- *
- */
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Derived from mor1kx/orpsoc Verilator testbench.
+//
+// Original authors:
+//   Olof Kindgren <olof.kindgren@gmail.com>
+//   Franck Jullien <franck.jullien@gmail.com>
+//
+// Modifications:
+//   Copyright 2026 Raul Schmidlin
+//   - Adapted for MinSoC-RV / Ibex
+//   - UART RX/TX simulation
+//   - Reset sequencing fixes
+//   - Interactive UART handling
 
+#include <iostream>
 #include <stdint.h>
 #include <signal.h>
 #include <argp.h>
@@ -20,18 +23,7 @@
 
 static bool done;
 
-#define NOP_NOP			0x0000      /* Normal nop instruction */
-#define NOP_EXIT		0x0001      /* End of simulation */
-#define NOP_REPORT		0x0002      /* Simple report */
-#define NOP_PUTC		0x0004      /* Simputc instruction */
-#define NOP_CNT_RESET		0x0005      /* Reset statistics counters */
-#define NOP_GET_TICKS		0x0006      /* Get # ticks running */
-#define NOP_GET_PS		0x0007      /* Get picosecs/cycle */
-#define NOP_TRACE_ON		0x0008      /* Turn on tracing */
-#define NOP_TRACE_OFF		0x0009      /* Turn off tracing */
-#define NOP_RANDOM		0x000a      /* Return 4 random bytes */
-#define NOP_OR1KSIM		0x000b      /* Return non-zero if this is Or1ksim */
-#define NOP_EXIT_SILENT		0x000c      /* End of simulation, quiet version */
+#define WIF_OPCODE 0x10500073UL
 
 #define RESET_TIME		10
 
@@ -199,11 +191,23 @@ int uart_transmit_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     return -1;
 }
 
+bool instruction_detect_wfi(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils) 
+{
+    if (top->minsoc_rv_top->ibexi_ack
+        && (top->minsoc_rv_top->ibexi_dat_r == WIF_OPCODE)) {
+            return true;
+    }
+
+    return false;
+}
+
 int main(int argc, char **argv, char **env)
 {
+    std::cout << "STARTING" << std::endl;
 	uint32_t insn = 0;
 	uint32_t ex_pc = 0;
     bool line_finished = false;
+    bool send_character = false;
 
 	Verilated::commandArgs(argc, argv);
 
@@ -236,14 +240,17 @@ int main(int argc, char **argv, char **env)
 		tbUtils->doJTAG(&top->tms_pad_i, &top->tdi_pad_i, &top->tck_pad_i, top->tdo_pad_o);
 
         int byte = uart_decoder_step(top, tbUtils);
-        if (byte == '\n' && !tbUtils->getJtagEnable()) {
-            line_finished = true;
-        }
-        if (line_finished) {
+
+        if (send_character) {
             uart_transmit_step(top, tbUtils);    
-            if (byte == 'Z') {
+            if (byte == 'Z' && !tbUtils->getJtagEnable()) {
                 done = true;
             }
+        }
+
+        if (instruction_detect_wfi(top, tbUtils)) {
+            send_character = true;
+            std::cout << "instr detected" << std::endl;
         }
 	}
 

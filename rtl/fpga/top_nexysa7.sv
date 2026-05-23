@@ -1,8 +1,10 @@
-// Copyright lowRISC contributors.
-// Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Derived in part from ibex-demo-system
+//
+// Copyright lowRISC contributors
+// Copyright 2026 Raul Schmidlin
 
-// This is the top level SystemVerilog file that connects the IO on the board to the Ibex Demo System.
 module top_nexysa7 #(
   parameter memfile = ""
   ) (

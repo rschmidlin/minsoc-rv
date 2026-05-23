@@ -1,4 +1,5 @@
 CAPI=2:
+# SPDX-License-Identifier: Apache-2.0
 
 name: ::minsoc-rv:0.1
 description: "Minimal System-on-Chip RISC-V"

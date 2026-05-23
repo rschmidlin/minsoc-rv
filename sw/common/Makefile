@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright 2026 Raul Schmidlin
+
 CROSS    = riscv64-unknown-elf-
 CC       = $(CROSS)gcc
 OBJCOPY  = $(CROSS)objcopy

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Copyright 2026 Raul Schmidlin
+
 module wb_backend (
     input  wire        clk,
     input  wire        rst,

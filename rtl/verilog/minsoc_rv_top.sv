@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Copyright 2026 Raul Schmidlin
+
 module minsoc_rv_top
   #(parameter MEM_SIZE = 32'h00010000,
     parameter IBEX = 1'b1,
@@ -28,6 +32,10 @@ wire wb_clk = wb_clk_i;
 wire wb_rst = wb_rst_i;
 
 `include "wb_intercon.vh"
+
+// Public aliases for testbench access (/* verilator public */ required for Verilator 5.x)
+wire ibexi_ack     /* verilator public */ = wb_s2m_ibexi_ack;
+wire [31:0] ibexi_dat_r /* verilator public */ = wb_s2m_ibexi_dat;
 
 
 ////////////////////////////////////////////////////////////////////////
