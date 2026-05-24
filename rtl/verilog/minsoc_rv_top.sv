@@ -20,7 +20,7 @@ module minsoc_rv_top
 
 localparam wb_aw = 32;
 localparam wb_dw = 32;
-localparam debug_start_address = 32'h1A110000;
+localparam debug_start_address = 32'h0010_0000;
 
 
 ////////////////////////////////////////////////////////////////////////

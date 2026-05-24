@@ -13,13 +13,6 @@
 #include "demo_system_regs.h"
 #include "uart.h"
 
-#define UART_IRQ_NUM 16
-#define UART_IRQ (1 << UART_IRQ_NUM)
-
-#define TIMER_IRQ (1 << 7)
-
-#define SYSCLK_FREQ 50000000
-
 /**
  * Writes character to default UART. Signature matches c stdlib function
  * of the same name.

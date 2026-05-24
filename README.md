@@ -40,11 +40,21 @@ Next steps:
     1) [X] Interruptfähigkeit
     2) [X] Timer
     3) [X] Set license
-    4) [ ] Re-organize base addresses
+    4) [X] Re-organize base addresses
     5) [ ] Clean-up unused wires and file formatting
     6) [ ] Cache
     7) [ ] Axi-Adapter
     8) [ ] Build with Yosys? 
+
+## Planned memory mapping
+
+Region	                            Address
+BRAM / boot RAM	                    0x0000_0000 – 0x0000_FFFF
+Debug ROM	                        0x0001_0000
+Internal SRAM / future TCM	        0x0100_0000
+UART	                            0x1000_0000
+Timer                               0x1000_1000
+External DDR / AXI memory	        0x8000_0000
 
 ## Licensing
 

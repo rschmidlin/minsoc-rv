@@ -3,6 +3,7 @@
 // Copyright 2026 Raul Schmidlin
 
 #include "dev_access.h"
+#include "demo_system_regs.h"
 #include "timer.h"
 
 unsigned int timer_get(void) 

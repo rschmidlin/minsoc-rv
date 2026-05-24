@@ -6,10 +6,6 @@
 #include "demo_system.h"
 #include "uart.h"
 
-#define STACK_SIZE	0x01000
-
-#define UART_BAUD_RATE 	115200
-
 #define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
 
 #define WAIT_FOR_XMITR \

@@ -7,15 +7,13 @@
 #include "timer.h"
 //#include <stdio.h>
 
-#define UART_BASE  		0x90000000
-
 /* ------------------------------------------------------------------ */
 /* main                                                               */
 /* ------------------------------------------------------------------ */
 int main(void)
 {
     unsigned int start = timer_get();
-    uart_init(UART_BASE);
+    uart_init(UART0_BASE);
     install_exception_handler(UART_IRQ_NUM, &uart_interrupt);
     enable_interrupts(UART_IRQ);
     set_global_interrupt_enable(1);
