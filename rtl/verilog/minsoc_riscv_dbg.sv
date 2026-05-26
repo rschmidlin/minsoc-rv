@@ -266,7 +266,7 @@ ibex_backend slave_ibex_backend (
     // Request
     .req_valid(slave_req_valid),
     .req_addr(slave_req_addr),
-    .req_len(slave_req_len),   // up to 16 beats
+    .req_len(slave_req_len),
     .req_we(slave_req_we),
     .req_wdata(slave_req_wdata),
     .req_be(slave_req_be),

@@ -59,24 +59,7 @@ wb_ram #(
 
 ////////////////////////////////////////////////////////////////////////
 //
-// UART (32-to-8 bit bridge, word-addressed registers)
-//
-// PicoRV32 word-aligns all bus addresses (adr[1:0] always 00) and
-// sets sel=0 on reads (mem_wstrb is zero for loads).  To make both
-// reads and writes work without modifying the CPU, the UART registers
-// are mapped at 4-byte (word) spacing:
-//
-//   UART_BASE + 0x00  ->  register 0  (TX/RX/DLL)
-//   UART_BASE + 0x04  ->  register 1  (IER/DLM)
-//   UART_BASE + 0x08  ->  register 2  (FCR/IIR)
-//   UART_BASE + 0x0C  ->  register 3  (LCR)
-//   UART_BASE + 0x10  ->  register 4  (MCR)
-//   UART_BASE + 0x14  ->  register 5  (LSR)
-//   UART_BASE + 0x18  ->  register 6  (MSR)
-//   UART_BASE + 0x1C  ->  register 7  (SCR)
-//
-// adr[4:2] gives the 3-bit UART register index directly.
-// Data is always in the low byte (bits [7:0]) of the 32-bit bus.
+// UART 8-bit big endian (accesses from RISC-V converted from little-endian)
 //
 ////////////////////////////////////////////////////////////////////////
 wire uart_irq;
