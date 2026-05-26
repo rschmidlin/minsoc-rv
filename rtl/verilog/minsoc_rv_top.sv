@@ -16,7 +16,7 @@ module minsoc_rv_top #(
     output uart_stx_o
 );
 
-  localparam debug_start_address = 32'h0010_0000;
+  localparam debug_start_address = 32'h1A110000;
 
 
   ////////////////////////////////////////////////////////////////////////
@@ -214,7 +214,8 @@ module minsoc_rv_top #(
 
   minsoc_riscv_dbg #(
       .NrHarts    (1),
-      .IdcodeValue(32'h11001cdf)
+      .IdcodeValue(32'h11001cdf),
+      .DmBaseAddress('h1000)
   ) minsoc_riscv_dbg_i (
       .clk_i(wb_clk),
       .rst_ni(~wb_rst),

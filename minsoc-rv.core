@@ -154,12 +154,12 @@ generate:
           offset : 0
           size : 0x10000 # 64 kbytes
         dbgs:
-          offset: 0x00100000
+          offset: 0x1A110000 # std conf Ibex
           size: 0x10000 # 64 kbytes
         uart:
           datawidth : 8
-          offset : 0x10000000
+          offset : 0x20000000
           size : 0x20
         timer:
-          offset : 0x10001000
+          offset : 0x20001000
           size : 0x20
