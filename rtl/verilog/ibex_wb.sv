@@ -96,10 +96,10 @@ module ibex_wb import ibex_pkg::*; #(
 
 	// Debug interface (optional)
 	input  wire        debug_req_i,
-	output wire [63:0] crash_dump_o,
+	output wire [159:0] crash_dump_o,
 
 	// Control signals
-	input  wire        fetch_enable_i,
+	input  wire [3:0]  fetch_enable_i,
 	output wire        alert_minor_o,
 	output wire        alert_major_internal_o,
 	output wire        alert_major_bus_o,
@@ -112,7 +112,6 @@ module ibex_wb import ibex_pkg::*; #(
 	wire        instr_rvalid;
 	wire [31:0] instr_addr;
 	wire [31:0] instr_rdata;
-	wire        instr_err;
 
 	// Data memory interface signals
 	wire        data_req;
@@ -123,7 +122,6 @@ module ibex_wb import ibex_pkg::*; #(
 	wire [31:0] data_addr;
 	wire [31:0] data_wdata;
 	wire [31:0] data_rdata;
-	wire        data_err;
 
 	// Instruction backend adapter signals
 	wire        instr_req_valid;
@@ -202,9 +200,9 @@ module ibex_wb import ibex_pkg::*; #(
 		
 		// enable all clock gates for testing
 		.test_en_i(1'b0),
-		.ram_cfg_icache_tag_i(1'b0),
+		.ram_cfg_icache_tag_i(12'h000),
 		.ram_cfg_rsp_icache_tag_o(),
-		.ram_cfg_icache_data_i(1'b0),
+		.ram_cfg_icache_data_i(12'h000),
 		.ram_cfg_rsp_icache_data_o(),
 
 		// Configuration
@@ -217,8 +215,8 @@ module ibex_wb import ibex_pkg::*; #(
 		.instr_rvalid_i(instr_rvalid),
 		.instr_addr_o(instr_addr),
 		.instr_rdata_i(instr_rdata),
-		.instr_rdata_intg_i(32'b0),
-		.instr_err_i(instr_err),
+		.instr_rdata_intg_i(7'h00),
+		.instr_err_i(instr_wb_err),
 
 		// Data memory interface
 		.data_req_o(data_req),
@@ -230,8 +228,8 @@ module ibex_wb import ibex_pkg::*; #(
 		.data_wdata_o(data_wdata),
 		.data_wdata_intg_o(),
 		.data_rdata_i(data_rdata),
-		.data_rdata_intg_i(32'b0),
-		.data_err_i(data_err),
+		.data_rdata_intg_i(7'h00),
+		.data_err_i(data_wb_err),
 
 		// Interrupt inputs
 		.irq_software_i(irq_software_i),
@@ -287,7 +285,6 @@ module ibex_wb import ibex_pkg::*; #(
 	assign instr_gnt = ~instr_busy;
 	assign instr_rvalid = instr_resp_valid;
 	assign instr_rdata = instr_resp_rdata;
-	assign instr_err = 1'b0;  // No errors for now
 
 	assign instr_req_valid = instr_req;
 	assign instr_req_addr = instr_addr;
@@ -305,7 +302,6 @@ module ibex_wb import ibex_pkg::*; #(
 	assign data_gnt = ~data_resp_busy;
 	assign data_rvalid = data_resp_valid;
 	assign data_rdata = data_resp_rdata;
-	assign data_err = 1'b0;  // No errors for now
 
 	assign data_req_valid = data_req;
 	assign data_req_addr = data_addr;

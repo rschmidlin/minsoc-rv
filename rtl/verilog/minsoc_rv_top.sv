@@ -4,7 +4,6 @@
 
 module minsoc_rv_top
   #(parameter MEM_SIZE = 32'h00010000,
-    parameter IBEX = 1'b1,
     parameter memfile = ""
    )
 (
@@ -18,8 +17,6 @@ module minsoc_rv_top
 		output uart_stx_o
 );
 
-localparam wb_aw = 32;
-localparam wb_dw = 32;
 localparam debug_start_address = 32'h0010_0000;
 
 
@@ -122,7 +119,7 @@ uart_top #(
    //
    // Timer
    //
-   tc tc(
+   tc u_tc(
       .clk(wb_clk_i),
       .rst(wb_rst_i),
       .wb_adr_i(wb_m2s_timer_adr[16:0]),
@@ -145,10 +142,6 @@ uart_top #(
    //
 
 
-  wire        mem_instr_req;
-  wire [31:0] mem_instr_rdata;
-  wire        dbg_instr_req;
-
   // Internally generated resets cause IMPERFECTSCH warnings
   /* verilator lint_off IMPERFECTSCH */
   wire rst_core_n;
@@ -159,11 +152,6 @@ uart_top #(
 
    wire irq_software_i, irq_timer_i, irq_external_i, irq_nm_i;
    wire [14:0] irq_fast_i;
-
-   wire debug_req_i;
-   wire [63:0] crash_dump_o;
-
-   wire alert_minor_o, alert_major_internal_o, alert_major_bus_o, core_sleep_o;
    wire [3:0] fetch_enable_i;
 
    assign irq_software_i = 1'b0;
@@ -172,10 +160,8 @@ uart_top #(
    assign irq_nm_i = 1'b0;
    assign irq_fast_i = {14'h0000, uart_irq};
 
-   assign debug_req_i = 1'b0;
-
    assign fetch_enable_i = 4'b0101;
-   
+
    ibex_wb #(
       .PMPEnable(1'b0),
       .PMPGranularity(0),
@@ -224,14 +210,14 @@ uart_top #(
 
 // Debug interface (optional)
          .debug_req_i(dm_debug_req),
-         .crash_dump_o(crash_dump_o),
+         .crash_dump_o(),
 
 // Control signals
          .fetch_enable_i(fetch_enable_i),
-         .alert_minor_o(alert_minor_o),
-         .alert_major_internal_o(alert_major_internal_o),
-         .alert_major_bus_o(alert_major_bus_o),
-         .core_sleep_o(core_sleep_o)
+         .alert_minor_o(),
+         .alert_major_internal_o(),
+         .alert_major_bus_o(),
+         .core_sleep_o()
          );
 
 

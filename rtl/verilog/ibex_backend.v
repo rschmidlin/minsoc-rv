@@ -3,9 +3,6 @@
 // Copyright 2026 Raul Schmidlin
 
 module ibex_backend (
-    input  wire        clk,
-    input  wire        rst,
-
     // Wishbone
     input wire         wb_cyc,
     input wire         wb_stb,

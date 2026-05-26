@@ -53,7 +53,6 @@ module minsoc_riscv_dbg #(
 );
 
 	// Master backend adapter signals
-	wire        master_req;
   wire        master_req_valid;
 	wire [31:0] master_req_addr;
 	wire [ 3:0] master_req_len;
@@ -66,22 +65,12 @@ module minsoc_riscv_dbg #(
 	wire [31:0] master_resp_rdata;
     wire        master_rerror;
 
-    // Slave memory interface signals
-	wire        slave_req;
-	wire        slave_gnt;
-	wire        slave_rvalid;
-	wire [31:0] slave_addr;
-	wire [31:0] slave_rdata;
-	wire        slave_err;
-
 	// Slave backend adapter signals
 	wire        slave_req_valid;
 	wire [31:0] slave_req_addr;
-	wire [ 3:0] slave_req_len;
 	wire        slave_req_we;
 	wire [31:0] slave_req_wdata;
-	wire        slave_req_be;
-	wire        slave_resp_valid;
+	wire [3:0]  slave_req_be;
 	wire [31:0] slave_resp_rdata;
 
     // DTM wiring
@@ -128,7 +117,7 @@ dm_top #(
   .next_dm_addr_i(next_dm_addr_i),
   .testmode_i(testmode_i),
   .ndmreset_o(ndmreset_o),  // non-debug module reset
-  .ndmreset_ack_i(ndmreset_q), // non-debug module reset acknowledgement pulse
+  .ndmreset_ack_i(ndmreset_ack_i), // non-debug module reset acknowledgement pulse
   .dmactive_o(dmactive_o),  // debug module is active
   .debug_req_o(debug_req_o), // async debug request
   // communicate whether the hart is unavailable (e.g.: power down)
@@ -228,23 +217,23 @@ wb_backend master_wb_backend (
 
 
 assign slave_wb_err_o = 1'b0; // no error for now
-assign slave_req_len = 4'h1;
 
 wire [31:0] dbgs_data_r;
-reg wb_req;
 
 always @(posedge clk_i) begin
   if (!rst_ni) begin
     slave_wb_ack_o   <= 1'b0;
     slave_wb_dat_r_o <= 32'h0;
-    wb_req <= 1'b0;
   end else begin
-    wb_req <= slave_wb_cyc_i & slave_wb_stb_i;
-    slave_wb_ack_o <= wb_req;
-
     if (slave_wb_cyc_i & slave_wb_stb_i) begin
+      slave_wb_ack_o <= 1'b1;
       slave_wb_dat_r_o <= dbgs_data_r;
     end
+
+    if (slave_wb_ack_o) begin
+      slave_wb_ack_o <= 1'b0;
+    end
+
   end
 end
 
@@ -253,9 +242,6 @@ end
  * Slave Ibex adapter
  */ 
 ibex_backend slave_ibex_backend (
-    .clk(clk_i),
-    .rst(~rst_ni),
-
     // Wishbone
     .wb_cyc(slave_wb_cyc_i),
     .wb_stb(slave_wb_stb_i),
@@ -269,13 +255,13 @@ ibex_backend slave_ibex_backend (
     // Request
     .req_valid(slave_req_valid),
     .req_addr(slave_req_addr),
-    .req_len(slave_req_len),   // up to 16 beats
+    .req_len(),
     .req_we(slave_req_we),
     .req_wdata(slave_req_wdata),
     .req_be(slave_req_be),
 
     // Response
-    .resp_valid(slave_resp_valid),
+    .resp_valid(),
     .resp_rdata(slave_resp_rdata)
 );
 

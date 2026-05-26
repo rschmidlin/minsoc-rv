@@ -45,7 +45,7 @@ module wb_backend (
             state <= IDLE;
             wb_cyc <= 0;
             wb_stb <= 0;
-            wb_sel <= 1'b0;
+            wb_sel <= 4'h0;
             busy <= 0;
         end else begin
             resp_valid <= 0;
@@ -91,6 +91,13 @@ module wb_backend (
             DONE: begin
                 busy <= 0;
                 state <= IDLE;
+            end
+            default: begin
+                state <= IDLE;
+                wb_cyc <= 0;
+                wb_stb <= 0;
+                wb_sel <= 4'h0;
+                busy <= 0;
             end
             endcase
         end
