@@ -1,4 +1,5 @@
 CAPI=2:
+# SPDX-License-Identifier: Apache-2.0
 
 name: ::minsoc-rv:0.1
 description: "Minimal System-on-Chip RISC-V"
@@ -17,6 +18,7 @@ filesets:
       - "pulp:riscv:debug_module"
       - ">=uart16550-1.5.4"
       - "=wb_ram-1.1-r2026"
+      - "timer"
   verilog_tb_files:
     files:
       - bench/verilog/minsoc_rv_tb.v: {file_type: verilogSource}
@@ -113,18 +115,22 @@ generate:
             - mem
             - dbgs
             - uart
+            - timer
         dbgm:
           slaves:
             - mem
       slaves:
-        dbgs:
-          offset: 0x1A110000 # std conf Ibex
-          size: 0x10000 # 64 kbytes
         mem:
           offset : 0
           size : 0x10000 # 64 kbytes
+        dbgs:
+          offset: 0x00100000 # std conf Ibex
+          size: 0x10000 # 64 kbytes
         uart:
           datawidth : 8
-          offset : 0x90000000
+          offset : 0x10000000
+          size : 0x20
+        timer:
+          offset : 0x10001000
           size : 0x20
   

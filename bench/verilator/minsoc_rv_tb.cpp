@@ -1,16 +1,19 @@
-/*
- * mor1kx-generic system Verilator testbench
- *
- * Author: Olof Kindgren <olof.kindgren@gmail.com>
- * Author: Franck Jullien <franck.jullien@gmail.com>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
- *
- */
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Derived from mor1kx/orpsoc Verilator testbench.
+//
+// Original authors:
+//   Olof Kindgren <olof.kindgren@gmail.com>
+//   Franck Jullien <franck.jullien@gmail.com>
+//
+// Modifications:
+//   Copyright 2026 Raul Schmidlin
+//   - Adapted for MinSoC-RV / Ibex
+//   - UART RX/TX simulation
+//   - Reset sequencing fixes
+//   - Interactive UART handling
 
+#include <iostream>
 #include <stdint.h>
 #include <signal.h>
 #include <argp.h>
@@ -20,20 +23,9 @@
 
 static bool done;
 
-#define NOP_NOP			0x0000      /* Normal nop instruction */
-#define NOP_EXIT		0x0001      /* End of simulation */
-#define NOP_REPORT		0x0002      /* Simple report */
-#define NOP_PUTC		0x0004      /* Simputc instruction */
-#define NOP_CNT_RESET		0x0005      /* Reset statistics counters */
-#define NOP_GET_TICKS		0x0006      /* Get # ticks running */
-#define NOP_GET_PS		0x0007      /* Get picosecs/cycle */
-#define NOP_TRACE_ON		0x0008      /* Turn on tracing */
-#define NOP_TRACE_OFF		0x0009      /* Turn off tracing */
-#define NOP_RANDOM		0x000a      /* Return 4 random bytes */
-#define NOP_OR1KSIM		0x000b      /* Return non-zero if this is Or1ksim */
-#define NOP_EXIT_SILENT		0x000c      /* End of simulation, quiet version */
+#define WIF_OPCODE 0x10500073UL
 
-#define RESET_TIME		2
+#define RESET_TIME		10
 
 vluint64_t main_time = 0;       // Current simulation time
 // This is a 64-bit integer to reduce wrap over issues and
@@ -148,10 +140,79 @@ int uart_decoder_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     return -1;
 }
 
+int uart_transmit_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
+{
+    static unsigned int state = 0;
+    static uint64_t start_timestamp = 0;
+    static uint8_t byte = 'Y';
+    static uint64_t bit_timestamp = 0;
+    static uint8_t bitnr = 0;
+    uint64_t elapsed = 0;
+    static bool byte_sent = false;
+    if (!byte_sent) {
+        switch (state) {
+            case 0: // Set start bit
+                start_timestamp = tbUtils->getTime();
+                top->uart_srx_i = 0;
+                state = 1;
+                break;
+            case 1: // wait for start bit
+                if (tbUtils->getTime() - start_timestamp >= (UART_TX_WAIT))
+                {
+                    bit_timestamp = tbUtils->getTime();
+                    state = 2;
+                }
+                break;
+            case 2: // Send data bits
+                elapsed = tbUtils->getTime() - bit_timestamp;
+                top->uart_srx_i = (byte >> bitnr) & 1;
+                if (elapsed >= UART_TX_WAIT) {
+                    bitnr++;
+                    bit_timestamp = tbUtils->getTime();
+                    if (bitnr >= 7) {
+                        state = 3;
+                    }
+                }
+                break;
+            case 3: // wait for stop bit to finish
+                elapsed = tbUtils->getTime() - bit_timestamp;
+                top->uart_srx_i = 0;
+                if (elapsed >= UART_TX_WAIT) {
+                    state = 0;
+                    top->uart_srx_i = 1;
+                    byte_sent = true;
+                }
+                break;
+            default:
+                state = 0;
+                break;
+        }
+    }
+    return -1;
+}
+
+bool instruction_detect_wfi(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
+{
+    // WFI at 0xd2 and 0x14a are 2-byte aligned (RVC boundary) but not 4-byte aligned.
+    // The Wishbone bus fetches 32-bit words at 4-byte aligned addresses, so the
+    // word-aligned addresses containing these WFIs are 0xd0 and 0x148 respectively.
+    // The opcode 0x10500073 is split across two fetches; the lower 16 bits (0x0073)
+    // appear in dat_r[31:16] of the aligned fetch.
+
+    if (top->minsoc_rv_top->ibexi_ack
+        && ((top->minsoc_rv_top->ibexi_dat_r >> 16) == (WIF_OPCODE & 0xFFFF))) {
+            return true;
+    }
+
+    return false;
+}
+
 int main(int argc, char **argv, char **env)
 {
 	uint32_t insn = 0;
 	uint32_t ex_pc = 0;
+    bool line_finished = false;
+    bool send_character = false;
 
 	Verilated::commandArgs(argc, argv);
 
@@ -164,13 +225,17 @@ int main(int argc, char **argv, char **env)
 	signal(SIGINT, INThandler);
 
 	top->wb_clk_i = 0;
-	top->wb_rst_i = 1;
+	top->wb_rst_i = 0;
+    top->uart_srx_i = 1;
 
 	top->trace(tbUtils->tfp, 99);
 
 	while (tbUtils->doCycle() && !done) {
-		if (tbUtils->getTime() > RESET_TIME)
-			top->wb_rst_i = 0;
+		if (tbUtils->getTime() > RESET_TIME && tbUtils->getTime() < 2*RESET_TIME)
+			top->wb_rst_i = 1;
+        else if (tbUtils->getTime() >= 2*RESET_TIME) {
+            top->wb_rst_i = 0;
+        }
 
 		top->eval();
 
@@ -179,8 +244,16 @@ int main(int argc, char **argv, char **env)
 		tbUtils->doJTAG(&top->tms_pad_i, &top->tdi_pad_i, &top->tck_pad_i, top->tdo_pad_o);
 
         int byte = uart_decoder_step(top, tbUtils);
-        if (byte == '\n' && !tbUtils->getJtagEnable()) {
-            done = true;
+
+        if (send_character) {
+            uart_transmit_step(top, tbUtils);    
+            if (byte == 'Z' && !tbUtils->getJtagEnable()) {
+                done = true;
+            }
+        }
+
+        if (byte == 8) {
+            send_character = true;
         }
 	}
 

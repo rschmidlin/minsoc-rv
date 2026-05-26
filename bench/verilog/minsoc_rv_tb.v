@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Derived from mor1kx-generic Verilog testbench.
+//
+// Modifications:
+//   Copyright 2026 Raul Schmidlin
+//   - Adapted for MinSoC-RV / Ibex
+//   - Simplified monitor infrastructure
+//   - UART-driven interaction
+
 module minsoc_rv_tb;
 
    localparam MEM_SIZE = 32'h02000000; //Set default memory size to 32MB
