@@ -219,21 +219,20 @@ module minsoc_riscv_dbg #(
   assign slave_wb_err_o = 1'b0;  // no error for now
 
   wire [31:0] dbgs_data_r;
+  reg wb_req;
 
   always @(posedge clk_i) begin
     if (!rst_ni) begin
-      slave_wb_ack_o   <= 1'b0;
+      slave_wb_ack_o <= 1'b0;
       slave_wb_dat_r_o <= 32'h0;
+      wb_req <= 1'b0;
     end else begin
+      wb_req <= slave_wb_cyc_i & slave_wb_stb_i;
+      slave_wb_ack_o <= wb_req;
+
       if (slave_wb_cyc_i & slave_wb_stb_i) begin
-        slave_wb_ack_o   <= 1'b1;
         slave_wb_dat_r_o <= dbgs_data_r;
       end
-
-      if (slave_wb_ack_o) begin
-        slave_wb_ack_o <= 1'b0;
-      end
-
     end
   end
 
