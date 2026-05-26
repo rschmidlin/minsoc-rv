@@ -194,7 +194,7 @@ module ibex_wb
       // RTL/netlist version here using their own unique encoding (e.g. 32 bits of the git hash of the
       // implemented commit).
       .CsrMimpId(CsrMimpId)
-  ) i_ibex (
+  ) ibex_top_i (
       // Clock and reset
       .clk_i (clk_i),
       .rst_ni(rst_ni),
@@ -314,7 +314,7 @@ module ibex_wb
   /*
 	 * Instruction Wishbone Backend Adapter Instance
 	 */
-  wb_backend i_instr_wb_backend (
+  ibex_wb_host_adapter instr_wb_adapter_i (
       .clk(clk_i),
       .rst(~rst_ni),
       .req_valid(instr_req_valid),
@@ -339,7 +339,7 @@ module ibex_wb
   /*
 	 * Data Wishbone Backend Adapter Instance
 	 */
-  wb_backend i_data_wb_backend (
+  ibex_wb_host_adapter data_wb_adapter_i (
       .clk(clk_i),
       .rst(~rst_ni),
       .req_valid(data_req_valid),

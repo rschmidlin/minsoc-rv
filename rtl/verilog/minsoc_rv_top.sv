@@ -43,7 +43,7 @@ module minsoc_rv_top #(
   wb_ram #(
       .depth  (MEM_SIZE),
       .memfile(memfile)
-  ) wb_bfm_memory0 (
+  ) wb_ram_i (
       //Wishbone Master interface
       .wb_clk_i(wb_clk_i),
       .wb_rst_i(wb_rst_i),
@@ -76,7 +76,7 @@ module minsoc_rv_top #(
   uart_top #(
       .debug(0),
       .SIM  (0)
-  ) uart16550 (
+  ) uart_top_i (
       .wb_clk_i(wb_clk_i),
       .wb_rst_i(wb_rst_i),
       .wb_adr_i(wb_big_endian_uart_adr),
@@ -103,7 +103,7 @@ module minsoc_rv_top #(
   //
   // Timer
   //
-  tc u_tc (
+  tc tc_i (
       .clk(wb_clk_i),
       .rst(wb_rst_i),
       .wb_adr_i(wb_m2s_timer_adr[16:0]),
@@ -154,7 +154,7 @@ module minsoc_rv_top #(
       .DbgHwBreakNum  (2),
       .DmHaltAddr     (debug_start_address + dm::HaltAddress[31:0]),
       .DmExceptionAddr(debug_start_address + dm::ExceptionAddress[31:0])
-  ) u_ibex (
+  ) ibex_wb_i (
       .clk_i (wb_clk),
       .rst_ni(rst_core_n),
 
@@ -214,7 +214,7 @@ module minsoc_rv_top #(
   minsoc_riscv_dbg #(
       .NrHarts    (1),
       .IdcodeValue(32'h11001cdf)
-  ) riscv_dbg (
+  ) minsoc_riscv_dbg_i (
       .clk_i(wb_clk),
       .rst_ni(~wb_rst),
       .next_dm_addr_i(32'h0000_0000),

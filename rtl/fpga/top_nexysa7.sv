@@ -24,7 +24,7 @@ module top_nexysa7 #(
   // Instantiating the Ibex Demo System.
   minsoc_rv_top #(
       .memfile(memfile)
-  ) u_minsoc_rv_top (
+  ) minsoc_rv_top_i (
       .wb_clk_i  (clk_sys),
       .wb_rst_i  (~rst_sys_n),
       .tdo_pad_o (),

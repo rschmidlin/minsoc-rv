@@ -105,7 +105,7 @@ module minsoc_riscv_dbg #(
       .SelectableHarts(SelectableHarts),
       // toggle new behavior to drive master_be_o during a read
       .ReadByteEnable(ReadByteEnable)
-  ) u_dm_top (
+  ) dm_top_i (
       .clk_i         (clk_i),           // clock
       // asynchronous reset active low, connect PoR here, not the system reset
       .rst_ni        (rst_ni),
@@ -159,7 +159,7 @@ module minsoc_riscv_dbg #(
   // JTAG TAP
   dmi_jtag #(
       .IdcodeValue(IdcodeValue)
-  ) dap (
+  ) dmi_jtag_i (
       .clk_i      (clk_i),
       .rst_ni     (rst_ni),
       .testmode_i (testmode_i),
@@ -191,7 +191,7 @@ module minsoc_riscv_dbg #(
   /*
  * Host Wishbone backend adapter
  */
-  wb_backend master_wb_backend (
+  ibex_wb_host_adapter ibex_wb_host_adapter_i (
       .clk(clk_i),
       .rst(~rst_ni),
 
@@ -240,7 +240,7 @@ module minsoc_riscv_dbg #(
   /*
  * Slave Ibex adapter
  */
-  ibex_backend slave_ibex_backend (
+  wb_ibex_device_adapter wb_ibex_device_adapter_i (
       // Wishbone
       .wb_cyc(slave_wb_cyc_i),
       .wb_stb(slave_wb_stb_i),

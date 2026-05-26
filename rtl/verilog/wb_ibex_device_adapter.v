@@ -2,7 +2,7 @@
 //
 // Copyright 2026 Raul Schmidlin
 
-module ibex_backend (
+module wb_ibex_device_adapter (
     // Wishbone
     input  wire        wb_cyc,
     input  wire        wb_stb,

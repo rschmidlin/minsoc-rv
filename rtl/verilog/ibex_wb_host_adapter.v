@@ -2,7 +2,7 @@
 //
 // Copyright 2026 Raul Schmidlin
 
-module wb_backend (
+module ibex_wb_host_adapter (
     input wire clk,
     input wire rst,
 

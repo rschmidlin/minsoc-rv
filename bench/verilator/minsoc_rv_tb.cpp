@@ -218,9 +218,10 @@ int main(int argc, char **argv, char **env)
 
 	Vminsoc_rv_top* top = new Vminsoc_rv_top;
 	VerilatorTbUtils* tbUtils =
-		new VerilatorTbUtils(top->minsoc_rv_top->wb_bfm_memory0->ram0->mem.data());
+		new VerilatorTbUtils(top->minsoc_rv_top->wb_ram_i->ram0->mem.data());
 
 	parse_args(argc, argv, tbUtils);
+	tbUtils->parsePlusArgs();
 
 	signal(SIGINT, INThandler);
 
