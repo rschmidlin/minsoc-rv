@@ -2,8 +2,8 @@
 //
 // Copyright 2026 Raul Schmidlin
 
-#ifndef DEMO_SYSTEM_REGS_H__
-#define DEMO_SYSTEM_REGS_H__
+#ifndef MINSOC_RV_SYSTEM_CONF
+#define MINSOC_RV_SYSTEM_CONF
 
 #define SYSCLK_FREQ 50000000
 

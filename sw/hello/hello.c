@@ -3,6 +3,7 @@
 // Copyright 2026 Raul Schmidlin
 
 #include "demo_system.h"
+#include "minsoc_rv_system_conf.h"
 #include "uart.h"
 #include "timer.h"
 //#include <stdio.h>

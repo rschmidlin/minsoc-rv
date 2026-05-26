@@ -2,7 +2,7 @@
 //
 // Copyright 2026 Raul Schmidlin
 
-#include "dev_access.h"
+#include "minsoc_rv_system_conf.h"
 #include "demo_system.h"
 #include "uart.h"
 

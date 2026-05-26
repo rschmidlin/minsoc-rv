@@ -152,6 +152,7 @@ module minsoc_rv_top #(
       .PMPNumRegions  (4),
       .DbgTriggerEn   (1'b1),
       .DbgHwBreakNum  (2),
+      .DmBaseAddr     (debug_start_address),
       .DmHaltAddr     (debug_start_address + dm::HaltAddress[31:0]),
       .DmExceptionAddr(debug_start_address + dm::ExceptionAddress[31:0])
   ) ibex_wb_i (

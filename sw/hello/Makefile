@@ -13,7 +13,7 @@ ARCH     = -march=rv32imc_zicsr_zifencei -mabi=ilp32 -mcmodel=medany -Wall -fvis
 CFLAGS   = $(ARCH) -O0 -g -Wall -ffreestanding -nostdlib
 LDFLAGS  = $(ARCH) -T link.ld -nostartfiles -nostdlib -lgcc
 
-TARGET   = firmware
+TARGET   = hello
 
 .PHONY: all clean
 
@@ -23,8 +23,8 @@ LIB 	 = common
 
 all: $(TARGET).elf $(TARGET).bin $(TARGET).dis
 
-$(TARGET).elf: firmware.c link.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) -I$(INCDIR) -L$(LIBDIR) -o $@ firmware.c ../common/crt0.o -l$(LIB)
+$(TARGET).elf: hello.c link.ld
+	$(CC) $(CFLAGS) $(LDFLAGS) -I$(INCDIR) -L$(LIBDIR) -o $@ hello.c ../common/crt0.o -l$(LIB)
 
 $(TARGET).bin: $(TARGET).elf
 	$(OBJCOPY) -O verilog $< $@_tmp

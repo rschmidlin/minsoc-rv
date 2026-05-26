@@ -2,11 +2,11 @@
 //
 // Copyright 2026 Raul Schmidlin
 
-#include "dev_access.h"
-#include "demo_system_regs.h"
 #include "timer.h"
+#include "demo_system.h"
+#include "minsoc_rv_system_conf.h"
 
 unsigned int timer_get(void) 
 {
-    return DEV_READ(TIMER_BASE_ADDR+0);
+    return REG32(TIMER_BASE_ADDR+0);
 }

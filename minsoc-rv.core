@@ -154,7 +154,7 @@ generate:
           offset : 0
           size : 0x10000 # 64 kbytes
         dbgs:
-          offset: 0x00100000 # std conf Ibex
+          offset: 0x00100000
           size: 0x10000 # 64 kbytes
         uart:
           datawidth : 8

@@ -5,7 +5,7 @@
 # Copyright lowRISC contributors
 # Copyright 2026 Raul Schmidlin
 
-#include "demo_system_regs.h"
+#include "minsoc_rv_system_conf.h"
 
 .section .text
 

@@ -6,8 +6,7 @@
 // Copyright 2026 Raul Schmidlin
 
 #include "demo_system.h"
-
-#include "dev_access.h"
+#include "minsoc_rv_system_conf.h"
 #include "uart.h"
 
 int putchar(int c) {

@@ -10,8 +10,14 @@
 
 #include <stdint.h>
 
-#include "demo_system_regs.h"
-#include "uart.h"
+/* Register access macros */
+#define REG8(add) *((volatile unsigned char *)(add))
+#define REG16(add) *((volatile unsigned short *)(add))
+#define REG32(add) *((volatile unsigned long *)(add))
+/* Register access macros */
+#define REG8(add) *((volatile unsigned char *)(add))
+#define REG16(add) *((volatile unsigned short *)(add))
+#define REG32(add) *((volatile unsigned long *)(add))
 
 /**
  * Writes character to default UART. Signature matches c stdlib function
