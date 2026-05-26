@@ -62,14 +62,16 @@ module minsoc_rv_top #(
   assign wb_s2m_mem_rty = 1'b0;
 
 
-////////////////////////////////////////////////////////////////////////
-//
-// UART 8-bit big endian (accesses from RISC-V converted from little-endian)
-//
-////////////////////////////////////////////////////////////////////////
-wire uart_irq;
-wire [31:0] wb_big_endian_uart_adr;
-assign wb_big_endian_uart_adr = {wb_m2s_uart_adr[31:2], ~wb_m2s_uart_adr[1:0]};  // Convert little-endian word address to big-endian byte address
+  ////////////////////////////////////////////////////////////////////////
+  //
+  // UART 8-bit big endian (accesses from RISC-V converted from little-endian)
+  //
+  ////////////////////////////////////////////////////////////////////////
+  wire uart_irq;
+  wire [31:0] wb_big_endian_uart_adr;
+  assign wb_big_endian_uart_adr = {
+    wb_m2s_uart_adr[31:2], ~wb_m2s_uart_adr[1:0]
+  };  // Convert little-endian word address to big-endian byte address
 
   uart_top #(
       .debug(0),
