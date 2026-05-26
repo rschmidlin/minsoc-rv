@@ -8,10 +8,10 @@ filesets:
   soc_files:
     files:
       - rtl/verilog/minsoc_rv_top.sv
-      - rtl/verilog/wb_backend.v
+      - rtl/verilog/ibex_wb_host_adapter.v
       - rtl/verilog/ibex_wb.sv
       - rtl/verilog/minsoc_riscv_dbg.sv
-      - rtl/verilog/ibex_backend.v
+      - rtl/verilog/wb_ibex_device_adapter.v
     file_type: verilogSource
     depend:
       - "lowrisc:ibex:ibex_top"
@@ -31,9 +31,9 @@ filesets:
       - bench/verilator/minsoc_rv_tb.cpp: {file_type: cppSource}
     depend:
       - "lowrisc:prim_generic:all"
-      - verilator_tb_utils
+      - "=verilator_tb_utils-1.1-r2026"
   wb_intercon_dep:
-    depend: 
+    depend:
       - ~wb_intercon-1.2
   xilinx_files:
     files:
@@ -49,25 +49,48 @@ filesets:
 
 targets:
   default: &default
-    default_tool: icarus
+    flow: sim
+    default_tool: verilator
     filesets:
       - soc_files
       - wb_intercon_dep
       - "tool_icarus ? (verilog_tb_files)"
       - "tool_verilator ? (verilator_tb_files)"
       - "tool_vivado ? (xilinx_files)"
-    toplevel: 
+    toplevel:
       - "tool_icarus ? (minsoc_rv_tb)"
       - "tool_verilator ? (minsoc_rv_top)"
       - "tool_vivado ? (top_nexysa7)"
     generate:
       - wb_intercon
+    flow_options:
+      tool: verilator
+      verilator_options: [-Wno-fatal, --trace, -LDFLAGS, -lelf]
+      iverilog_options:
+        - -g2012
+
+  lint:
+    <<: *default
+    flow: lint
+    flow_options:
+      tool: verilator
+      verilator_options:
+        - -Wall
+        - -Wpedantic
+
+  # veriblelint has no flow API backend yet; this target keeps the legacy tool API
+  lint-verible:
+    default_tool: veriblelint
+    filesets:
+      - soc_files
+      - wb_intercon_dep
+    toplevel: minsoc_rv_top
+    generate:
+      - wb_intercon
     tools:
-      verilator:
-        verilator_options: [-Wno-fatal, --trace]
-      icarus:
-        iverilog_options:
-          - -g2012
+      veriblelint:
+        rules:
+          - "+all"
 
   sim:
     <<: *default
@@ -75,16 +98,17 @@ targets:
     parameters:
       - clear_ram
       - memfile
+      - elf_load
 
   synth:
     <<: *default
     description: Synthesize the design for a Nexys Video FPGA board
+    flow: vivado
     default_tool: vivado
-    filesets_append: 
+    filesets_append:
       - files_constraints
-    tools:
-      vivado:
-        part: xc7a100tcsg324-2
+    flow_options:
+      part: xc7a100tcsg324-2
     parameters:
       - memfile
 
@@ -100,6 +124,12 @@ parameters:
     description: File to preload the block RAM with - must be vmem hex format
     paramtype  : vlogparam
     scope      : private
+
+  elf_load :
+    datatype : file
+    description : ELF file to preload to memory
+    paramtype : plusarg
+    scope : public
 
 generate:
   wb_intercon:
@@ -133,4 +163,3 @@ generate:
         timer:
           offset : 0x10001000
           size : 0x20
-  
