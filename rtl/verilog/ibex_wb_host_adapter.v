@@ -20,7 +20,7 @@ module ibex_wb_host_adapter (
     output reg        resp_valid,
     output reg [31:0] resp_rdata,
 
-    // Wishbone B4
+    // Wishbone
     output reg         wb_cyc,
     output reg         wb_stb,
     output reg         wb_we,
@@ -28,15 +28,8 @@ module ibex_wb_host_adapter (
     output reg  [31:0] wb_dat_w,
     input  wire        wb_ack,
     input  wire [31:0] wb_dat_r,
-    output reg  [ 3:0] wb_sel,
-    output reg  [ 2:0] wb_cti,   // Cycle Type Identifier
-    output wire [ 1:0] wb_bte    // Burst Type Extension (always linear)
+    output reg  [ 3:0] wb_sel
 );
-
-  localparam CTI_CLASSIC = 3'b000;  // Classic single cycle
-  localparam CTI_INCR    = 3'b010;  // Incrementing burst
-
-  assign wb_bte = 2'b00;  // Linear burst, always
 
   reg [ 3:0] beat_cnt;
   reg [31:0] addr;
@@ -44,7 +37,7 @@ module ibex_wb_host_adapter (
   reg [ 1:0] state;
 
   localparam IDLE = 2'h0;
-  localparam RUN  = 2'h1;
+  localparam RUN = 2'h1;
   localparam DONE = 2'h2;
 
   always @(posedge clk) begin
@@ -53,7 +46,6 @@ module ibex_wb_host_adapter (
       wb_cyc <= 0;
       wb_stb <= 0;
       wb_sel <= 4'h0;
-      wb_cti <= CTI_CLASSIC;
       busy   <= 0;
     end else begin
       resp_valid <= 0;
@@ -61,17 +53,18 @@ module ibex_wb_host_adapter (
       case (state)
         IDLE: begin
           if (req_valid) begin
-            busy     <= 1;
-            wb_cyc   <= 1;
-            wb_stb   <= 1;
-            wb_we    <= req_we;
-            addr     <= req_addr;
-            wb_adr   <= req_addr;
+            busy <= 1;
+            wb_cyc <= 1;
+            wb_stb <= 1;
+            wb_we <= req_we;
+
+            addr <= req_addr;
+            wb_adr <= req_addr;
             wb_dat_w <= req_wdata;
             beat_cnt <= req_len;
-            wb_sel   <= req_be;
-            wb_cti   <= (req_len == 1) ? CTI_CLASSIC : CTI_INCR;
-            state    <= RUN;
+            wb_sel <= req_be;
+
+            state <= RUN;
           end
         end
 
@@ -104,7 +97,6 @@ module ibex_wb_host_adapter (
           wb_cyc <= 0;
           wb_stb <= 0;
           wb_sel <= 4'h0;
-          wb_cti <= CTI_CLASSIC;
           busy   <= 0;
         end
       endcase

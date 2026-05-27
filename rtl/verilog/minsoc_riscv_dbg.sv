@@ -34,7 +34,7 @@ module minsoc_riscv_dbg #(
     output logic                  slave_wb_err_o,
     input  logic [BusWidth/8-1:0] slave_wb_sel_i,
 
-    // Wishbone B4 Master Interface
+    // Wishbone Master Interface
     output logic                  master_wb_cyc_o,
     output logic                  master_wb_stb_o,
     output logic                  master_wb_we_o,
@@ -44,8 +44,6 @@ module minsoc_riscv_dbg #(
     input  logic [  BusWidth-1:0] master_wb_dat_r_i,
     input  logic                  master_wb_err_i,
     output logic [BusWidth/8-1:0] master_wb_sel_o,
-    output logic [            2:0] master_wb_cti_o,
-    output logic [            1:0] master_wb_bte_o,
 
     input  logic tck_i,    // JTAG test clock pad
     input  logic tms_i,    // JTAG test mode select pad
@@ -214,39 +212,44 @@ module minsoc_riscv_dbg #(
       .wb_dat_w(master_wb_dat_w_o),
       .wb_ack(master_wb_ack_i),
       .wb_dat_r(master_wb_dat_r_i),
-      .wb_sel(master_wb_sel_o),
-      .wb_cti(master_wb_cti_o),
-      .wb_bte(master_wb_bte_o)
+      .wb_sel(master_wb_sel_o)
   );
 
 
   assign slave_wb_err_o = 1'b0;  // no error for now
 
-  // dm_top slave_rdata_o is combinatorial; one-cycle delay of req_valid is resp_valid
-  reg slave_resp_valid_r;
+  wire [31:0] dbgs_data_r;
+  reg wb_req;
+
   always @(posedge clk_i) begin
-    if (!rst_ni) slave_resp_valid_r <= 1'b0;
-    else         slave_resp_valid_r <= slave_req_valid;
+    if (!rst_ni) begin
+      slave_wb_ack_o <= 1'b0;
+      slave_wb_dat_r_o <= 32'h0;
+      wb_req <= 1'b0;
+    end else begin
+      wb_req <= slave_wb_cyc_i & slave_wb_stb_i;
+      slave_wb_ack_o <= wb_req;
+
+      if (slave_wb_cyc_i & slave_wb_stb_i) begin
+        slave_wb_dat_r_o <= dbgs_data_r;
+      end
+    end
   end
+
 
   /*
  * Slave Ibex adapter
  */
   wb_ibex_device_adapter wb_ibex_device_adapter_i (
-      .clk(clk_i),
-      .rst(~rst_ni),
-
-      // Wishbone B4
+      // Wishbone
       .wb_cyc(slave_wb_cyc_i),
       .wb_stb(slave_wb_stb_i),
       .wb_we(slave_wb_we_i),
       .wb_adr(slave_wb_adr_i),
       .wb_dat_w(slave_wb_dat_w_i),
+      .wb_ack(),
+      .wb_dat_r(dbgs_data_r),
       .wb_sel(slave_wb_sel_i),
-      .wb_cti(3'b000),   // debug master always uses classic cycles
-      .wb_bte(2'b00),
-      .wb_ack(slave_wb_ack_o),
-      .wb_dat_r(slave_wb_dat_r_o),
 
       // Request
       .req_valid(slave_req_valid),
@@ -257,7 +260,7 @@ module minsoc_riscv_dbg #(
       .req_be(slave_req_be),
 
       // Response
-      .resp_valid(slave_resp_valid_r),
+      .resp_valid(),
       .resp_rdata(slave_resp_rdata)
   );
 
