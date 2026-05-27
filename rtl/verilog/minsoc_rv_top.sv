@@ -159,7 +159,7 @@ module minsoc_rv_top #(
       .clk_i (wb_clk),
       .rst_ni(rst_core_n),
 
-      // Wishbone Instruction Memory Interface
+      // Wishbone B4 Instruction Memory Interface
       .instr_wb_cyc(wb_m2s_ibexi_cyc),
       .instr_wb_stb(wb_m2s_ibexi_stb),
       .instr_wb_we(wb_m2s_ibexi_we),
@@ -168,9 +168,11 @@ module minsoc_rv_top #(
       .instr_wb_ack(wb_s2m_ibexi_ack),
       .instr_wb_dat_r(wb_s2m_ibexi_dat),
       .instr_wb_err(wb_s2m_ibexi_err),
-      .instr_wb_sel(wb_m2s_ibexi_sel),  // byte enables for instruction bus only
+      .instr_wb_sel(wb_m2s_ibexi_sel),
+      .instr_wb_cti(wb_m2s_ibexi_cti),
+      .instr_wb_bte(wb_m2s_ibexi_bte),
 
-      // Wishbone Data Memory Interface
+      // Wishbone B4 Data Memory Interface
       .data_wb_cyc(wb_m2s_ibexd_cyc),
       .data_wb_stb(wb_m2s_ibexd_stb),
       .data_wb_we(wb_m2s_ibexd_we),
@@ -179,7 +181,9 @@ module minsoc_rv_top #(
       .data_wb_ack(wb_s2m_ibexd_ack),
       .data_wb_dat_r(wb_s2m_ibexd_dat),
       .data_wb_err(wb_s2m_ibexd_err),
-      .data_wb_sel(wb_m2s_ibexd_sel),  // byte enables for data bus only
+      .data_wb_sel(wb_m2s_ibexd_sel),
+      .data_wb_cti(wb_m2s_ibexd_cti),
+      .data_wb_bte(wb_m2s_ibexd_bte),
 
       // Configuration
       .hart_id_i  (32'h00000000),
@@ -248,6 +252,8 @@ module minsoc_rv_top #(
       .master_wb_dat_r_i(wb_s2m_dbgm_dat),
       .master_wb_err_i(wb_s2m_dbgm_err),
       .master_wb_sel_o(wb_m2s_dbgm_sel),
+      .master_wb_cti_o(wb_m2s_dbgm_cti),
+      .master_wb_bte_o(wb_m2s_dbgm_bte),
 
       .tck_i(tck_pad_i),
       .tms_i(tms_pad_i),
