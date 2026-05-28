@@ -35,10 +35,12 @@ module ibex_wb_host_adapter (
 
   localparam CTI_CLASSIC = 3'b000;  // Classic single cycle
   localparam CTI_INCR    = 3'b010;  // Incrementing burst
+  localparam CTI_EOB     = 3'b111;  // End of burst
 
   assign wb_bte = 2'b00;  // Linear burst, always
 
-  reg [ 3:0] beat_cnt;
+  reg [ 3:0] beat_num;   // current beat being presented, 1-indexed
+  reg [ 3:0] req_len_r;  // request length captured at start of transaction
   reg [31:0] addr;
 
   reg [ 1:0] state;
@@ -61,17 +63,18 @@ module ibex_wb_host_adapter (
       case (state)
         IDLE: begin
           if (req_valid) begin
-            busy     <= 1;
-            wb_cyc   <= 1;
-            wb_stb   <= 1;
-            wb_we    <= req_we;
-            addr     <= req_addr;
-            wb_adr   <= req_addr;
-            wb_dat_w <= req_wdata;
-            beat_cnt <= req_len;
-            wb_sel   <= req_be;
-            wb_cti   <= (req_len == 1) ? CTI_CLASSIC : CTI_INCR;
-            state    <= RUN;
+            busy      <= 1;
+            wb_cyc    <= 1;
+            wb_stb    <= 1;
+            wb_we     <= req_we;
+            addr      <= req_addr;
+            wb_adr    <= req_addr;
+            wb_dat_w  <= req_wdata;
+            req_len_r <= req_len;
+            beat_num  <= 1;
+            wb_sel    <= req_be;
+            wb_cti    <= (req_len == 1) ? CTI_CLASSIC : CTI_INCR;
+            state     <= RUN;
           end
         end
 
@@ -80,17 +83,16 @@ module ibex_wb_host_adapter (
             resp_rdata <= wb_dat_r;
             resp_valid <= 1;
 
-            beat_cnt   <= beat_cnt - 1;
-
-            if (beat_cnt == 1) begin
+            if (beat_num == req_len_r) begin
               wb_cyc <= 0;
               wb_stb <= 0;
               state  <= DONE;
             end else begin
-              // next beat
-              addr   <= addr + 4;
-              wb_adr <= addr + 4;
-              wb_stb <= 1;  // keep pipeline
+              beat_num <= beat_num + 1;
+              addr     <= addr + 4;
+              wb_adr   <= addr + 4;
+              wb_stb   <= 1;
+              wb_cti   <= (beat_num + 1 == req_len_r) ? CTI_EOB : CTI_INCR;
             end
           end
         end

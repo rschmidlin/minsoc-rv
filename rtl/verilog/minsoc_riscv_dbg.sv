@@ -33,6 +33,8 @@ module minsoc_riscv_dbg #(
     output logic [  BusWidth-1:0] slave_wb_dat_r_o,
     output logic                  slave_wb_err_o,
     input  logic [BusWidth/8-1:0] slave_wb_sel_i,
+    input  logic [           2:0] slave_wb_cti_i,
+    input  logic [           1:0] slave_wb_bte_i,
 
     // Wishbone B4 Master Interface
     output logic                  master_wb_cyc_o,
@@ -243,8 +245,8 @@ module minsoc_riscv_dbg #(
       .wb_adr(slave_wb_adr_i),
       .wb_dat_w(slave_wb_dat_w_i),
       .wb_sel(slave_wb_sel_i),
-      .wb_cti(3'b000),   // debug master always uses classic cycles
-      .wb_bte(2'b00),
+      .wb_cti(slave_wb_cti_i),
+      .wb_bte(slave_wb_bte_i),
       .wb_ack(slave_wb_ack_o),
       .wb_dat_r(slave_wb_dat_r_o),
 

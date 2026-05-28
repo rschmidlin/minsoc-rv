@@ -241,6 +241,8 @@ module minsoc_rv_top #(
       .slave_wb_dat_r_o(wb_s2m_dbgs_dat),
       .slave_wb_err_o(wb_s2m_dbgs_err),
       .slave_wb_sel_i(wb_m2s_dbgs_sel),
+      .slave_wb_cti_i(wb_m2s_dbgs_cti),
+      .slave_wb_bte_i(wb_m2s_dbgs_bte),
 
       // Wishbone Master Interface
       .master_wb_cyc_o(wb_m2s_dbgm_cyc),
