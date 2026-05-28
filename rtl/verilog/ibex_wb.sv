@@ -135,7 +135,6 @@ module ibex_wb
   wire [ 3:0] instr_req_len;
   wire        instr_req_we;
   wire [31:0] instr_req_wdata;
-  wire        instr_busy;
   wire        instr_resp_valid;
   wire [31:0] instr_resp_rdata;
 
@@ -145,7 +144,6 @@ module ibex_wb
   wire [ 3:0] data_req_len;
   wire        data_req_we;
   wire [31:0] data_req_wdata;
-  wire        data_resp_busy;
   wire        data_resp_valid;
   wire [31:0] data_resp_rdata;
 
@@ -288,7 +286,6 @@ module ibex_wb
 	 * request/response protocol for the wb_backend.
 	 */
 
-  assign instr_gnt       = ~instr_busy;
   assign instr_rvalid    = instr_resp_valid;
   assign instr_rdata     = instr_resp_rdata;
 
@@ -305,7 +302,6 @@ module ibex_wb
 	 * request/response protocol for the wb_backend.
 	 */
 
-  assign data_gnt        = ~data_resp_busy;
   assign data_rvalid     = data_resp_valid;
   assign data_rdata      = data_resp_rdata;
 
@@ -327,7 +323,7 @@ module ibex_wb
       .req_we(instr_req_we),
       .req_wdata(instr_req_wdata),
       .req_be(4'hF),
-      .busy(instr_busy),
+      .gnt(instr_gnt),
       .resp_valid(instr_resp_valid),
       .resp_rdata(instr_resp_rdata),
       .wb_cyc(instr_wb_cyc),
@@ -354,7 +350,7 @@ module ibex_wb
       .req_we(data_req_we),
       .req_wdata(data_req_wdata),
       .req_be(data_be),
-      .busy(data_resp_busy),
+      .gnt(data_gnt),
       .resp_valid(data_resp_valid),
       .resp_rdata(data_resp_rdata),
       .wb_cyc(data_wb_cyc),

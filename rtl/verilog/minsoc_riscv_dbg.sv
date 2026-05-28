@@ -64,7 +64,6 @@ module minsoc_riscv_dbg #(
   wire           [31:0] master_req_wdata;
   wire           [ 3:0] master_be;
   wire                  master_gnt;
-  wire                  master_busy;
   wire                  master_resp_valid;
   wire           [31:0] master_resp_rdata;
   wire                  master_rerror;
@@ -187,7 +186,6 @@ module minsoc_riscv_dbg #(
       .tdo_oe_o()
   );
 
-  assign master_gnt = ~master_busy;
   assign master_rerror = master_wb_err_i;
 
   assign master_req_len = 4'h1;  // Single beat
@@ -205,7 +203,7 @@ module minsoc_riscv_dbg #(
       .req_we(master_req_we),
       .req_wdata(master_req_wdata),
       .req_be(master_be),
-      .busy(master_busy),
+      .gnt(master_gnt),
       .resp_valid(master_resp_valid),
       .resp_rdata(master_resp_rdata),
 
