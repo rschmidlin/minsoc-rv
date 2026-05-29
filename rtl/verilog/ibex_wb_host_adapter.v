@@ -70,7 +70,6 @@ always @(posedge clk) begin
     accepted_len <= 'd0;
   end
   else begin
-    resp_valid <= 1'b0;  // default every cycle
     case (ib_state)
       IDLE: begin
         gnt_q <= 1'b0;
@@ -138,6 +137,7 @@ always @(posedge clk) begin
     wb_state <= IDLE;
   end
   else begin
+    resp_valid <= 1'b0;  // default every cycle
     case (wb_state)
       IDLE: begin
         resp_valid <= 1'b0;
