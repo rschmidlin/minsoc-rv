@@ -2,6 +2,10 @@
 //
 // Copyright 2026 Raul Schmidlin
 
+/* The adapter supports at most two outstanding Ibex grants:
+- one active Wishbone transfer
+- one buffered next request */
+
 module ibex_wb_host_adapter (
     input wire clk,
     input wire rst,
@@ -47,7 +51,6 @@ reg gnt_q;
 
 assign req_accepted = |(accepted_len);
 assign valid_req_pending = req_accepted;
-assign resp_valid = wb_ack;
 assign next_address = req_addr_q + 'd4;
 assign valid_req_address = valid_req_pending ? (req_addr == next_address) : 1'b1;
 assign valid_req = req_valid & valid_req_address;
@@ -131,6 +134,7 @@ always @(posedge clk) begin
   else begin
     case (wb_state)
       IDLE: begin
+        resp_valid <= 1'b0;
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
         wb_we <= 1'b0;
@@ -149,7 +153,7 @@ always @(posedge clk) begin
           wb_dat_w <= req_wdata;
           if (req_len > 'd1) begin
             wb_cti <= 3'b010;
-            wb_bte <= 2'b10;
+            wb_bte <= 2'b00;
           end
         end
       end
@@ -158,19 +162,27 @@ always @(posedge clk) begin
           resp_rdata <= wb_dat_r;
           wb_dat_w <= req_wdata;
           wb_adr <= req_addr_q; // we can calculate the address from here, but does not work for write data 
+          resp_valid <= 1'b1;
           transferred_len <= transferred_len + 'd1;
           if (((accepted_len == transferred_len + 'd2) && (ib_state == IDLE)) || (req_len == transferred_len  + 'd2)) begin
             wb_cti <= 3'b111;
             wb_state <= FINISH;
           end
+          if ((req_len == 'd1) 
+          || ((accepted_len == 'd1) && (ib_state == IDLE))) begin
+            wb_cyc <= 1'b0;
+            wb_stb <= 1'b0;
+            wb_state <= IDLE;
+          end
         end
-        if (!valid_req_pending) begin
+        if ((req_len != 'd1) && !valid_req_pending) begin
           wb_state <= FINISH;
         end
       end
       FINISH: begin
         if (wb_ack) begin
           resp_rdata <= wb_dat_r;
+          resp_valid <= 1'b1;
           wb_dat_w <= req_wdata;
           wb_adr <= req_addr_q;
           transferred_len <= transferred_len + 'd1;
