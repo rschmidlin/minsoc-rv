@@ -384,6 +384,58 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+
+
+  task test_resp_valid_deasserts_between_wb_acks;
+    begin
+      start_test("resp_valid is a one-cycle pulse; no duplicate response during WB wait state");
+
+      // Manual ACK control. This recreates the interrupt/UART failure class:
+      // first beat is acknowledged, then the slave inserts wait states before the
+      // next ACK. resp_valid must not remain high during that gap, otherwise Ibex
+      // may consume the same/old fetch response twice and lose halfword alignment.
+      stop_ack();
+
+      fork
+        begin
+          request_until_grant(32'h0000_05e8, 4'd2, 1'b0, 32'h0, 4'hf, 30);
+          request_until_grant(32'h0000_05ec, 4'd2, 1'b0, 32'h0, 4'hf, 30);
+        end
+        begin
+          // Wait for active WB transaction.
+          while (!(wb_cyc && wb_stb)) @(posedge clk);
+
+          // First ACK.
+          @(posedge clk);
+          wb_dat_r <= mem_data_for_addr(wb_adr);
+          wb_ack   <= 1'b1;
+          @(posedge clk);
+          wb_ack   <= 1'b0;
+
+          // Give the DUT one cycle to emit resp_valid for the first ACK.
+          @(posedge clk);
+          check(resp_valid == 1'b1, "expected resp_valid pulse after first ACK");
+
+          // Now insert a gap before the second ACK. During this whole gap,
+          // resp_valid must be low. This is the explicit regression check.
+          @(posedge clk);
+          check(resp_valid == 1'b0, "resp_valid stayed high after first response");
+          @(posedge clk);
+          check(resp_valid == 1'b0, "resp_valid duplicated response during WB wait state");
+
+          // Second ACK.
+          wb_dat_r <= mem_data_for_addr(wb_adr);
+          wb_ack   <= 1'b1;
+          @(posedge clk);
+          wb_ack   <= 1'b0;
+        end
+      join
+
+      wait_responses(2, 60);
+      expect_counts(2, 2);
+    end
+  endtask
+
   initial begin
     $dumpfile("ibex_wb_host_adapter_tb.vcd");
     $dumpvars(0, ibex_wb_host_adapter_tb);
@@ -396,6 +448,7 @@ module ibex_wb_host_adapter_tb;
     test_burst_continuous_ack();
     test_burst_slave_waitstates();
     test_req_gap_host_waitstate();
+    test_resp_valid_deasserts_between_wb_acks();
     test_nonincremental_branch_restart();
     test_write_classic();
 

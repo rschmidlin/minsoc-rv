@@ -1,0 +1,33 @@
+CAPI=2:
+# SPDX-License-Identifier: Apache-2.0
+
+name: ::ibex_wb_adapter:0.1
+description: "Adapter for Ibex to use Wishbone as memory interface"
+
+filesets:
+  soc_files:
+    files:
+      - rtl/verilog/ibex_wb_host_adapter.v
+      - rtl/verilog/wb_ibex_device_adapter.v
+    file_type: verilogSource
+  verilog_tb_files:
+    files:
+      - bench/verilog/ibex_wb_host_adapter_tb.sv: {file_type: systemVerilogSource}
+
+targets:
+  default: &default
+    flow: sim
+    default_tool: icarus
+    filesets:
+      - soc_files
+      - "tool_icarus ? (verilog_tb_files)"
+    toplevel:
+      - "tool_icarus ? (ibex_wb_host_adapter_tb)"
+    flow_options:
+      tool: icarus
+      iverilog_options:
+        - -g2012
+
+  sim:
+    <<: *default
+    description: Simulate the design

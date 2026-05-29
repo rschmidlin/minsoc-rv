@@ -34,7 +34,7 @@ module ibex_wb_host_adapter (
     input  wire [31:0] wb_dat_r,
     output reg  [ 3:0] wb_sel,
     output reg  [ 2:0] wb_cti,
-    output wire [ 1:0] wb_bte
+    output reg [ 1:0] wb_bte
 );
 
 
@@ -70,6 +70,7 @@ always @(posedge clk) begin
     accepted_len <= 'd0;
   end
   else begin
+    resp_valid <= 1'b0;  // default every cycle
     case (ib_state)
       IDLE: begin
         gnt_q <= 1'b0;
