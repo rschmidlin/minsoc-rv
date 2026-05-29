@@ -87,7 +87,7 @@ always @(posedge clk) begin
           ib_state <= STALL;
         end
         if ('d2 == accepted_len) begin
-          ib_state <= STALL;
+          ib_state <= STALL;        // needed for write data otherwise we lose the data in the WB_FSM
         end
       end
       STALL: begin
@@ -157,7 +157,7 @@ always @(posedge clk) begin
         if (wb_ack) begin
           resp_rdata <= wb_dat_r;
           wb_dat_w <= req_wdata;
-          wb_adr <= req_addr_q;
+          wb_adr <= req_addr_q; // we can calculate the address from here, but does not work for write data 
           transferred_len <= transferred_len + 'd1;
           if (((accepted_len == transferred_len + 'd2) && (ib_state == IDLE)) || (req_len == transferred_len  + 'd2)) begin
             wb_cti <= 3'b111;
