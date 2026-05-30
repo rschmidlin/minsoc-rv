@@ -2,9 +2,17 @@
 //
 // Copyright 2026 Raul Schmidlin
 
-/* The adapter supports at most two outstanding Ibex grants:
-- one active Wishbone transfer
-- one buffered next request */
+// The adapter supports at most two outstanding Ibex grants:
+//   - one active Wishbone transfer
+//   - one buffered next request 
+//   - ideally, Ibex requests come every cycle while the previous 
+//      request on Wishbone is transferred. The strategy is to 
+//      use the fact that Ibex requests and bursts should transfer
+//      data every cycle. 
+//
+// TODO: How to stop transaction if IB_FSM detects incontiguous address but Wishbone burst was started? 
+//       At the moment, going directly to CTI 000 and negating CYC, normally CTI 111 and CYC 1 required
+//       for one cycle. Potentially negate STB while going for CTI 111 and CYC? 
 
 module ibex_wb_host_adapter (
     input wire clk,

@@ -13,6 +13,8 @@ filesets:
   verilog_tb_files:
     files:
       - bench/verilog/ibex_wb_host_adapter_tb.sv: {file_type: systemVerilogSource}
+    depend:
+      - ">=vlog_tb_utils-1.0"
 
 targets:
   default: &default
@@ -31,3 +33,10 @@ targets:
   sim:
     <<: *default
     description: Simulate the design
+
+parameters:
+  vcd:
+    datatype   : str
+    description: File name to dump VCD to
+    paramtype  : plusarg
+    scope      : private

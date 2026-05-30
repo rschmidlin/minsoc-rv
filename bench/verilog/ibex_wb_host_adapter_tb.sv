@@ -7,6 +7,9 @@
 `timescale 1ns/1ps
 
 module ibex_wb_host_adapter_tb;
+
+  vlog_tb_utils vlog_tb_utils0();
+
   reg clk = 1'b0;
   reg rst = 1'b1;
 
