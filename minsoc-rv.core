@@ -65,7 +65,7 @@ targets:
       - wb_intercon
     flow_options:
       tool: verilator
-      verilator_options: [-Wno-fatal, -CFLAGS, -Wno-missing-field-initializers, -CFLAGS, -Wno-reorder, --trace, -LDFLAGS, -lelf]
+      verilator_options: [-Wno-fatal, -CFLAGS, -Wno-missing-field-initializers, -CFLAGS, -Wno-reorder, -CFLAGS, -Wno-implicit-fallthrough, --trace, -LDFLAGS, -lelf]
       iverilog_options:
         - -g2012
 
