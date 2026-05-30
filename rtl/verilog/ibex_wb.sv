@@ -63,7 +63,7 @@ module ibex_wb
     input wire clk_i,
     input wire rst_ni,
 
-    // Wishbone B4 Instruction Memory Interface
+    // Wishbone Instruction Memory Interface
     output wire        instr_wb_cyc,
     output wire        instr_wb_stb,
     output wire        instr_wb_we,
@@ -73,10 +73,8 @@ module ibex_wb
     input  wire [31:0] instr_wb_dat_r,
     input  wire        instr_wb_err,
     output wire [ 3:0] instr_wb_sel,
-    output wire [ 2:0] instr_wb_cti,
-    output wire [ 1:0] instr_wb_bte,
 
-    // Wishbone B4 Data Memory Interface
+    // Wishbone Data Memory Interface
     output wire        data_wb_cyc,
     output wire        data_wb_stb,
     output wire        data_wb_we,
@@ -86,8 +84,6 @@ module ibex_wb
     input  wire [31:0] data_wb_dat_r,
     input  wire        data_wb_err,
     output wire [ 3:0] data_wb_sel,
-    output wire [ 2:0] data_wb_cti,
-    output wire [ 1:0] data_wb_bte,
 
     // Configuration
     input wire [31:0] hart_id_i,
@@ -293,7 +289,7 @@ module ibex_wb
   assign instr_req_addr  = instr_addr;
   assign instr_req_we    = 1'b0;  // Instructions are always reads
   assign instr_req_wdata = 32'b0;
-  assign instr_req_len   = ICache ? 4'h2 : 4'h1;
+  assign instr_req_len   = 4'h1;  // Single beat
 
   /*
 	 * Data Memory Interface to Request/Response Adapter
@@ -333,9 +329,7 @@ module ibex_wb
       .wb_dat_w(instr_wb_dat_w),
       .wb_ack(instr_wb_ack),
       .wb_dat_r(instr_wb_dat_r),
-      .wb_sel(instr_wb_sel),
-      .wb_cti(instr_wb_cti),
-      .wb_bte(instr_wb_bte)
+      .wb_sel(instr_wb_sel)
   );
 
   /*
@@ -360,9 +354,7 @@ module ibex_wb
       .wb_dat_w(data_wb_dat_w),
       .wb_ack(data_wb_ack),
       .wb_dat_r(data_wb_dat_r),
-      .wb_sel(data_wb_sel),
-      .wb_cti(data_wb_cti),
-      .wb_bte(data_wb_bte)
+      .wb_sel(data_wb_sel)
   );
 
 endmodule

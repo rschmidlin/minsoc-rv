@@ -32,7 +32,7 @@ module ibex_wb_host_adapter (
     output reg        resp_valid,
     output reg [31:0] resp_rdata,
 
-    // Wishbone B4
+    // Wishbone
     output reg         wb_cyc,
     output reg         wb_stb,
     output reg         wb_we,
