@@ -68,6 +68,7 @@ localparam ACCEPT = 2'b01;
 localparam STALL = 2'b10;
 
 reg [1:0] ib_state;
+reg [1:0] wb_state;
 
 // Assert GNT with 2 cycles delay of request if not forbidden by transaction FSM
 always @(posedge clk) begin
@@ -124,8 +125,6 @@ assign gnt = gnt_q;
 
 localparam ACTIVE = 2'b01;
 localparam FINISH = 2'b10;
-
-reg [1:0] wb_state;
 
 wire wb_pending;
 
