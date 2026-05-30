@@ -3,11 +3,6 @@
 // Self-checking testbench for ibex_wb_host_adapter.
 // Focuses on Ibex request/grant ordering versus Wishbone ACK/response ordering.
 //
-// Intended usage, for example:
-//   iverilog -g2012 -o tb.vvp ibex_wb_host_adapter.v ibex_wb_host_adapter_tb.sv
-//   vvp tb.vvp
-//
-// or with Verilator after adapting the command line to your FuseSoC flow.
 
 `timescale 1ns/1ps
 
