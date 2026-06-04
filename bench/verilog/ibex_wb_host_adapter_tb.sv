@@ -3,13 +3,15 @@
 // Self-checking testbench for ibex_wb_host_adapter.
 // Focuses on Ibex request/grant ordering versus Wishbone ACK/response ordering.
 //
+// Intended usage, for example:
+//   iverilog -g2012 -o tb.vvp ibex_wb_host_adapter.v ibex_wb_host_adapter_tb.sv
+//   vvp tb.vvp
+//
+// or with Verilator after adapting the command line to your FuseSoC flow.
 
 `timescale 1ns/1ps
 
 module ibex_wb_host_adapter_tb;
-
-  vlog_tb_utils vlog_tb_utils0();
-
   reg clk = 1'b0;
   reg rst = 1'b1;
 
@@ -434,6 +436,91 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+
+
+  task test_window_reset_after_drained_burst;
+    integer g_before;
+    integer r_before;
+    begin
+      start_test("drained burst window resets before immediately accepting next request");
+
+      // Manual ACK control. This reproduces the 552296 ps class of bug:
+      // a 2-beat window is fully drained (accepted_len == transferred_len),
+      // req_valid remains high with the next sequential address, and the IB_FSM
+      // must start a fresh accounting window before granting the next request.
+      stop_ack();
+
+      req_len   <= 4'd2;
+      req_we    <= 1'b0;
+      req_wdata <= 32'h0;
+      req_be    <= 4'hf;
+      req_addr  <= 32'h0000_05a4;
+      req_valid <= 1'b1;
+
+      // First grant: 0x5a4
+      while (!gnt) @(posedge clk);
+      @(posedge clk);
+      req_addr <= 32'h0000_05a8;
+
+      // Second grant: 0x5a8
+      while (!gnt) @(posedge clk);
+      @(posedge clk);
+
+      // Keep Ibex asking for the next sequential word while the old window drains.
+      req_addr <= 32'h0000_05ac;
+
+      // Drain exactly the two accepted requests through Wishbone.
+      while (!(wb_cyc && wb_stb)) @(posedge clk);
+
+      wb_dat_r <= mem_data_for_addr(wb_adr);
+      wb_ack   <= 1'b1;
+      @(posedge clk);
+      wb_ack   <= 1'b0;
+
+      // Wait until first response was observed.
+      while (responses_seen < 1) @(posedge clk);
+
+      while (!(wb_cyc && wb_stb)) @(posedge clk);
+      wb_dat_r <= mem_data_for_addr(wb_adr);
+      wb_ack   <= 1'b1;
+      @(posedge clk);
+      wb_ack   <= 1'b0;
+
+      // Wait until second response was observed. At this point the previous window
+      // is drained. The next grant must be accounted as a fresh request, not as a
+      // continuation of the old window.
+      while (responses_seen < 2) @(posedge clk);
+
+      g_before = grants_seen;
+      r_before = responses_seen;
+      check(g_before == 2, "expected exactly two grants before new window");
+      check(r_before == 2, "expected exactly two responses before new window");
+
+      // Keep next request valid. The adapter should eventually grant it.
+      while (!gnt) @(posedge clk);
+      @(posedge clk);
+      req_valid <= 1'b0;
+
+      check(grants_seen == g_before + 1,
+            "new request after drained window should create exactly one additional grant");
+      check(granted_addr[g_before] == 32'h0000_05ac,
+            "new grant after drained window should be for next address 0x5ac");
+
+      // Now acknowledge exactly one new Wishbone transfer. A broken window reset can
+      // produce two responses here for this single new grant; the global scoreboard
+      // will flag that, and we also check the final counts explicitly.
+      while (!(wb_cyc && wb_stb)) @(posedge clk);
+      wb_dat_r <= mem_data_for_addr(wb_adr);
+      wb_ack   <= 1'b1;
+      @(posedge clk);
+      wb_ack   <= 1'b0;
+
+      wait_responses(3, 80);
+      repeat (4) @(posedge clk);
+      expect_counts(3, 3);
+    end
+  endtask
+
   initial begin
     $dumpfile("ibex_wb_host_adapter_tb.vcd");
     $dumpvars(0, ibex_wb_host_adapter_tb);
@@ -446,6 +533,7 @@ module ibex_wb_host_adapter_tb;
     test_burst_continuous_ack();
     test_burst_slave_waitstates();
     test_req_gap_host_waitstate();
+    test_window_reset_after_drained_burst();
     test_resp_valid_deasserts_between_wb_acks();
     test_nonincremental_branch_restart();
     test_write_classic();
