@@ -112,8 +112,13 @@ always @(posedge clk) begin
                   (transferred_len + 'd2 == accepted_len)) begin
           if (accepted_len == req_len)
             ib_state <= IDLE;
-          else
+          else begin
+            if ((wb_state == IDLE) && (accepted_len == transferred_len)) begin  // if wb_fsm just finished a transaction, accepted_len must start from 0
+              req_addr_q   <= 32'h0000_0000;
+              accepted_len <= 'd0;
+            end
             ib_state <= ACCEPT;
+          end
         end
       end
     endcase

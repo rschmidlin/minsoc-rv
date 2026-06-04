@@ -191,20 +191,37 @@ int uart_transmit_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     return -1;
 }
 
-bool instruction_detect_wfi(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
+FILE * instr_file;
+
+void instruction_trace(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
 {
-    // WFI at 0xd2 and 0x14a are 2-byte aligned (RVC boundary) but not 4-byte aligned.
-    // The Wishbone bus fetches 32-bit words at 4-byte aligned addresses, so the
-    // word-aligned addresses containing these WFIs are 0xd0 and 0x148 respectively.
-    // The opcode 0x10500073 is split across two fetches; the lower 16 bits (0x0073)
-    // appear in dat_r[31:16] of the aligned fetch.
+    static unsigned int addr = 0;
 
-    if (top->minsoc_rv_top->ibexi_ack
-        && ((top->minsoc_rv_top->ibexi_dat_r >> 16) == (WIF_OPCODE & 0xFFFF))) {
-            return true;
+    uint64_t time = tbUtils->getTime();
+
+    if (top->minsoc_rv_top->ibexi_ack && (top->minsoc_rv_top->ibexi_adr != addr)) {
+        addr = top->minsoc_rv_top->ibexi_adr;
+        //(*output) << "Instr(" << std::hex << addr << "): " << std::dec << top->minsoc_rv_top->ibexi_dat_r << std::endl;
+        fprintf(instr_file, "Instr(0x%08x): 0x%08x @%d ps\n", addr, top->minsoc_rv_top->ibexi_dat_r, time);
     }
+}
 
-    return false;
+FILE * data_file;
+
+void data_trace(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
+{
+    static unsigned int addr = 0;
+    uint64_t time = tbUtils->getTime();
+
+    if (top->minsoc_rv_top->ibexd_ack && (top->minsoc_rv_top->ibexd_adr != addr)) {
+            addr = top->minsoc_rv_top->ibexi_adr;
+        if (top->minsoc_rv_top->ibexd_we) {
+            fprintf(data_file, "Data WR(0x%08x): 0x%08x @%d ps\n", addr, top->minsoc_rv_top->ibexd_dat_w, time);
+        }
+        else {
+            fprintf(data_file, "Data RD(0x%08x): 0x%08x @%d ps\n", addr, top->minsoc_rv_top->ibexd_dat_r, time);
+        }
+    }
 }
 
 int main(int argc, char **argv, char **env)
@@ -231,6 +248,9 @@ int main(int argc, char **argv, char **env)
 
 	top->trace(tbUtils->tfp, 99);
 
+    instr_file = fopen("instr.txt", "w");
+    data_file = fopen("data.txt", "w");
+
 	while (tbUtils->doCycle() && !done) {
 		if (tbUtils->getTime() > RESET_TIME && tbUtils->getTime() < 2*RESET_TIME)
 			top->wb_rst_i = 1;
@@ -244,6 +264,8 @@ int main(int argc, char **argv, char **env)
 
 		tbUtils->doJTAG(&top->tms_pad_i, &top->tdi_pad_i, &top->tck_pad_i, top->tdo_pad_o);
 
+        instruction_trace(top, tbUtils);
+        data_trace(top, tbUtils);
         int byte = uart_decoder_step(top, tbUtils);
 
         if (send_character) {
