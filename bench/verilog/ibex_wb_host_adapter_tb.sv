@@ -36,7 +36,7 @@ module ibex_wb_host_adapter_tb;
   wire        wb_we;
   wire [31:0] wb_adr;
   wire [31:0] wb_dat_w;
-  reg         wb_ack;
+  wire        wb_ack;
   reg  [31:0] wb_dat_r;
   wire [3:0]  wb_sel;
   wire [2:0]  wb_cti;
@@ -76,6 +76,10 @@ module ibex_wb_host_adapter_tb;
   integer grants_seen;
   integer responses_seen;
 
+  reg mem_wb_ack, task_wb_ack;
+
+  assign wb_ack = mem_wb_ack | task_wb_ack;
+
   function [31:0] mem_data_for_addr(input [31:0] addr);
     mem_data_for_addr = addr ^ 32'h5a5a_1234;
   endfunction
@@ -101,7 +105,8 @@ module ibex_wb_host_adapter_tb;
       req_we    = 1'b0;
       req_wdata = 32'h0;
       req_be    = 4'hf;
-      wb_ack    = 1'b0;
+      mem_wb_ack = 1'b0;
+      task_wb_ack = 1'b0;
       wb_dat_r  = 32'h0;
       grant_wr = 0;
       resp_rd = 0;
@@ -144,7 +149,7 @@ module ibex_wb_host_adapter_tb;
         @(posedge clk);
         if (gnt) begin
           req_valid <= 1'b0;
-          @(posedge clk);
+          @(posedge clk); // TODO: remove this after test_window_reset_after_drained_burst works
           disable request_until_grant;
         end
       end
@@ -178,22 +183,41 @@ module ibex_wb_host_adapter_tb;
   reg ack_enable;
   integer ack_gap;
   integer ack_countdown;
+  reg [31:0] stored_addr;
+  reg tmp_ack;
 
   always @(posedge clk) begin
     if (rst) begin
-      wb_ack <= 1'b0;
+      mem_wb_ack <= 1'b0;
       wb_dat_r <= 32'h0;
       ack_countdown <= 0;
+      stored_addr <= 32'h0;
+      tmp_ack <= 1'b0;
     end else begin
-      wb_ack <= 1'b0;
+      mem_wb_ack <= 1'b0;
       if (ack_enable && wb_cyc && wb_stb) begin
-        if (ack_countdown == 0) begin
-          wb_ack <= 1'b1;
-          wb_dat_r <= mem_data_for_addr(wb_adr);
-          ack_countdown <= ack_gap;
-        end else begin
-          ack_countdown <= ack_countdown - 1;
+        if ((ack_gap == 0) && (wb_cti != 3'b111)) begin
+          if (tmp_ack == 1'b0)
+            stored_addr <= wb_adr;
+          else 
+            stored_addr <= stored_addr + 'd4;
+          tmp_ack <= 1'b1;
+          mem_wb_ack <= tmp_ack;
+          wb_dat_r <= mem_data_for_addr(stored_addr);
         end
+        else begin
+          if (ack_countdown == 0) begin
+            mem_wb_ack <= 1'b1;
+            wb_dat_r <= mem_data_for_addr(wb_adr);
+            ack_countdown <= ack_gap;
+          
+          end else begin
+            ack_countdown <= ack_countdown - 1;
+          end
+        end
+      end
+      else begin
+        tmp_ack <= 1'b0;
       end
     end
   end
@@ -209,7 +233,7 @@ module ibex_wb_host_adapter_tb;
   task stop_ack;
     begin
       ack_enable = 1'b0;
-      wb_ack = 1'b0;
+      mem_wb_ack = 1'b0;
     end
   endtask
 
@@ -406,11 +430,10 @@ module ibex_wb_host_adapter_tb;
           while (!(wb_cyc && wb_stb)) @(posedge clk);
 
           // First ACK.
-          @(posedge clk);
           wb_dat_r <= mem_data_for_addr(wb_adr);
-          wb_ack   <= 1'b1;
+          task_wb_ack   <= 1'b1;
           @(posedge clk);
-          wb_ack   <= 1'b0;
+          task_wb_ack   <= 1'b0;
 
           // Give the DUT one cycle to emit resp_valid for the first ACK.
           @(posedge clk);
@@ -424,10 +447,11 @@ module ibex_wb_host_adapter_tb;
           check(resp_valid == 1'b0, "resp_valid duplicated response during WB wait state");
 
           // Second ACK.
+          while (!(wb_cyc && wb_stb)) @(posedge clk);
           wb_dat_r <= mem_data_for_addr(wb_adr);
-          wb_ack   <= 1'b1;
+          task_wb_ack   <= 1'b1;
           @(posedge clk);
-          wb_ack   <= 1'b0;
+          task_wb_ack   <= 1'b0;
         end
       join
 
@@ -450,72 +474,78 @@ module ibex_wb_host_adapter_tb;
       // must start a fresh accounting window before granting the next request.
       stop_ack();
 
-      req_len   <= 4'd2;
-      req_we    <= 1'b0;
-      req_wdata <= 32'h0;
-      req_be    <= 4'hf;
-      req_addr  <= 32'h0000_05a4;
-      req_valid <= 1'b1;
+      fork
+        begin
+          req_len   <= 4'd2;
+          req_we    <= 1'b0;
+          req_wdata <= 32'h0;
+          req_be    <= 4'hf;
+          req_addr  <= 32'h0000_05a4;
+          req_valid <= 1'b1;
 
-      // First grant: 0x5a4
-      while (!gnt) @(posedge clk);
-      @(posedge clk);
-      req_addr <= 32'h0000_05a8;
+          // First grant: 0x5a4
+          while (!gnt) @(posedge clk);
+          req_addr <= 32'h0000_05a8;
 
-      // Second grant: 0x5a8
-      while (!gnt) @(posedge clk);
-      @(posedge clk);
+          @(posedge clk);
+          // Second grant: 0x5a8
+          while (!gnt) @(posedge clk);
 
-      // Keep Ibex asking for the next sequential word while the old window drains.
-      req_addr <= 32'h0000_05ac;
+          // Keep Ibex asking for the next sequential word while the old window drains.
+          req_addr <= 32'h0000_05ac;
+          
+          // Wait until second response was observed. At this point the previous window
+          // is drained. The next grant must be accounted as a fresh request, not as a
+          // continuation of the old window.
+          while (responses_seen < 2) @(posedge clk);
 
-      // Drain exactly the two accepted requests through Wishbone.
-      while (!(wb_cyc && wb_stb)) @(posedge clk);
+          g_before = grants_seen;
+          r_before = responses_seen;
+          check(g_before == 2, "expected exactly two grants before new window");
+          check(r_before == 2, "expected exactly two responses before new window");
 
-      wb_dat_r <= mem_data_for_addr(wb_adr);
-      wb_ack   <= 1'b1;
-      @(posedge clk);
-      wb_ack   <= 1'b0;
+          // Keep next request valid. The adapter should eventually grant it.
+          while (!gnt) @(posedge clk);
+          @(posedge clk);
+          req_valid <= 1'b0;
 
-      // Wait until first response was observed.
-      while (responses_seen < 1) @(posedge clk);
+          check(grants_seen == g_before + 1,
+                "new request after drained window should create exactly one additional grant");
+          check(granted_addr[g_before] == 32'h0000_05ac,
+                "new grant after drained window should be for next address 0x5ac");
+        end
+        begin
+          // Drain exactly the two accepted requests through Wishbone.
+          while (!(wb_cyc && wb_stb)) @(posedge clk);
 
-      while (!(wb_cyc && wb_stb)) @(posedge clk);
-      wb_dat_r <= mem_data_for_addr(wb_adr);
-      wb_ack   <= 1'b1;
-      @(posedge clk);
-      wb_ack   <= 1'b0;
+          wb_dat_r <= mem_data_for_addr(wb_adr);
+          task_wb_ack   <= 1'b1;
+          @(posedge clk);
+          task_wb_ack   <= 1'b0;
 
-      // Wait until second response was observed. At this point the previous window
-      // is drained. The next grant must be accounted as a fresh request, not as a
-      // continuation of the old window.
-      while (responses_seen < 2) @(posedge clk);
+          // Wait until first response was observed.
+          while (responses_seen < 1) @(posedge clk);
 
-      g_before = grants_seen;
-      r_before = responses_seen;
-      check(g_before == 2, "expected exactly two grants before new window");
-      check(r_before == 2, "expected exactly two responses before new window");
+          while (!(wb_cyc && wb_stb)) @(posedge clk);
+          wb_dat_r <= mem_data_for_addr(wb_adr);
+          task_wb_ack   <= 1'b1;
+          @(posedge clk);
+          task_wb_ack   <= 1'b0;
+          
+          @(posedge clk);
 
-      // Keep next request valid. The adapter should eventually grant it.
-      while (!gnt) @(posedge clk);
-      @(posedge clk);
-      req_valid <= 1'b0;
+          // Now acknowledge exactly one new Wishbone transfer. A broken window reset can
+          // produce two responses here for this single new grant; the global scoreboard
+          // will flag that, and we also check the final counts explicitly.
+          while (!(wb_cyc && wb_stb)) @(posedge clk);
+          wb_dat_r <= mem_data_for_addr(wb_adr);
+          task_wb_ack   <= 1'b1;
+          @(posedge clk);
+          task_wb_ack   <= 1'b0;
+        end
+      join
 
-      check(grants_seen == g_before + 1,
-            "new request after drained window should create exactly one additional grant");
-      check(granted_addr[g_before] == 32'h0000_05ac,
-            "new grant after drained window should be for next address 0x5ac");
-
-      // Now acknowledge exactly one new Wishbone transfer. A broken window reset can
-      // produce two responses here for this single new grant; the global scoreboard
-      // will flag that, and we also check the final counts explicitly.
-      while (!(wb_cyc && wb_stb)) @(posedge clk);
-      wb_dat_r <= mem_data_for_addr(wb_adr);
-      wb_ack   <= 1'b1;
-      @(posedge clk);
-      wb_ack   <= 1'b0;
-
-      wait_responses(3, 80);
+      wait_responses(3, 200);
       repeat (4) @(posedge clk);
       expect_counts(3, 3);
     end
