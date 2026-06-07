@@ -47,10 +47,8 @@ module ibex_wb_host_adapter (
 
 
 wire req_accepted;
-wire valid_req_pending;
 wire [31:0] next_address;
 wire valid_req_address;
-wire valid_req;
 
 reg [3:0] transferred_len;
 reg [3:0] accepted_len;
@@ -58,10 +56,8 @@ reg [31:0] req_addr_q;
 reg gnt_q;
 
 assign req_accepted = |(accepted_len);
-assign valid_req_pending = req_accepted;
 assign next_address = req_addr_q + 'd4;
-assign valid_req_address = valid_req_pending ? (req_addr == next_address) : 1'b1;
-assign valid_req = req_valid & valid_req_address;
+assign valid_req_address = (req_addr == next_address);
 
 localparam IDLE = 2'b00;
 localparam ACCEPT = 2'b01;
@@ -86,13 +82,15 @@ always @(posedge clk) begin
           req_addr_q   <= 32'h0000_0000;
           accepted_len <= 'd0;
         end
-        if (valid_req && !wb_cyc) begin
+        if (req_valid && !wb_cyc) begin
           ib_state <= ACCEPT;
         end
       end
       ACCEPT: begin
         gnt_q <= 1'b0;
-        if (valid_req) begin
+        if (req_valid 
+        && (!req_accepted 
+        || valid_req_address)) begin
           accepted_len <= accepted_len + 'd1;
           req_addr_q <= req_addr;
           gnt_q <= 1'b1;
@@ -105,7 +103,7 @@ always @(posedge clk) begin
         end
       end
       STALL: begin
-        if (!valid_req) begin
+        if (!req_valid) begin
           ib_state <= IDLE;
         end
         else if ((transferred_len == accepted_len) ||
