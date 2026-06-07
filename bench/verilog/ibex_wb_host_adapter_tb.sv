@@ -183,7 +183,7 @@ module ibex_wb_host_adapter_tb;
   integer ack_gap;
   integer ack_countdown;
   reg [31:0] stored_addr;
-  reg tmp_ack;
+  integer tmp_ack;
 
   always @(posedge clk) begin
     if (rst) begin
@@ -191,17 +191,17 @@ module ibex_wb_host_adapter_tb;
       wb_dat_r <= 32'h0;
       ack_countdown <= 0;
       stored_addr <= 32'h0;
-      tmp_ack <= 1'b0;
+      tmp_ack <= 0;
     end else begin
       mem_wb_ack <= 1'b0;
       if (ack_enable && wb_cyc && wb_stb) begin
         if ((ack_gap == 0) && (wb_cti != 3'b111)) begin
-          if (tmp_ack == 1'b0)
+          if (tmp_ack < 2)
             stored_addr <= wb_adr;
           else 
             stored_addr <= stored_addr + 'd4;
-          tmp_ack <= 1'b1;
-          mem_wb_ack <= tmp_ack;
+          tmp_ack <= tmp_ack + 1;
+          mem_wb_ack <= (tmp_ack != 0);
           wb_dat_r <= mem_data_for_addr(stored_addr);
         end
         else begin
@@ -216,7 +216,8 @@ module ibex_wb_host_adapter_tb;
         end
       end
       else begin
-        tmp_ack <= 1'b0;
+        tmp_ack <= 0;
+        stored_addr <= 32'h0;
       end
     end
   end
@@ -278,7 +279,8 @@ module ibex_wb_host_adapter_tb;
 
   task expect_counts(input integer g, input integer r);
     begin
-      $display("Grants seen: %d, responses seen: %d", grants_seen, responses_seen);
+      if ((grants_seen != g) || (responses_seen != r))
+        $display("Grants seen: %d, responses seen: %d", grants_seen, responses_seen);
       check(grants_seen == g, "unexpected number of grants");
       check(responses_seen == r, "unexpected number of responses");
     end
@@ -315,7 +317,10 @@ module ibex_wb_host_adapter_tb;
           wait_responses(4, 120);
         end
       join
+      @(posedge clk);
+      @(posedge clk);
       expect_counts(4, 4);
+       
     end
   endtask
 
