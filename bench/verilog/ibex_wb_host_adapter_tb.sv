@@ -201,7 +201,7 @@ module ibex_wb_host_adapter_tb;
           else 
             stored_addr <= stored_addr + 'd4;
           tmp_ack <= tmp_ack + 1;
-          mem_wb_ack <= (tmp_ack != 0);
+          mem_wb_ack <= (tmp_ack >= 2);
           wb_dat_r <= mem_data_for_addr(stored_addr);
         end
         else begin
