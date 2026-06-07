@@ -509,17 +509,18 @@ module ibex_wb_host_adapter_tb;
 
           // Second grant: 0x5a8
           while (!gnt) @(posedge clk);
-          
-          check(grants_seen == g_before + 1,
-                "new request after drained window should create exactly one additional grant");
-          check(granted_addr[g_before] == 32'h0000_05a8,
-                "new grant after drained window should be for next address 0x5a8");
 
           // Keep Ibex asking for the next sequential word while the old window drains.
           req_addr <= 32'h0000_05ac;
 
           // Keep next request valid. The adapter should eventually grant it.
           @(posedge clk);
+          
+          check(grants_seen == g_before + 1,
+                "new request after drained window should create exactly one additional grant");
+          check(granted_addr[g_before] == 32'h0000_05a8,
+                "new grant after drained window should be for next address 0x5a8");
+                
           while (!gnt) @(posedge clk);
         end
         begin

@@ -50,12 +50,13 @@ wire req_accepted;
 wire [31:0] next_address;
 wire valid_req_address;
 
+reg [3:0] start_len;
 reg [3:0] transferred_len;
 reg [3:0] accepted_len;
 reg [31:0] req_addr_q;
 reg gnt_q;
 
-assign req_accepted = |(accepted_len);
+assign req_accepted = (accepted_len != start_len);
 assign next_address = req_addr_q + 'd4;
 assign valid_req_address = (req_addr == next_address);
 
@@ -73,6 +74,7 @@ always @(posedge clk) begin
     req_addr_q <= 32'h0000_0000;
     gnt_q <= 1'b0;
     accepted_len <= 'd0;
+    start_len <= 'd0;
   end
   else begin
     case (ib_state)
@@ -80,7 +82,7 @@ always @(posedge clk) begin
         gnt_q <= 1'b0;
         if ((wb_state == IDLE) && (accepted_len == transferred_len)) begin  // accepted_len impacts ongoing burst if cleared too early
           req_addr_q   <= 32'h0000_0000;
-          accepted_len <= 'd0;
+          start_len <= accepted_len;
         end
         if (req_valid && !wb_cyc) begin
           ib_state <= ACCEPT;
@@ -95,28 +97,26 @@ always @(posedge clk) begin
           req_addr_q <= req_addr;
           gnt_q <= 1'b1;
         end
-        else if (!gnt_q) begin  // if no request is there, STALL and potentially go to IDLE in sequence because !valid_req
-          ib_state <= STALL;
-        end
-        if ('d2 == accepted_len) begin
-          ib_state <= STALL;        // needed for write data otherwise we lose the data in the WB_FSM
+        else begin
+          if (!gnt_q) begin  // after gnt is cleared new address is there, STALL if no request or address
+            ib_state <= STALL;
+          end
+          if ((accepted_len - transferred_len) > 'd2) begin
+            ib_state <= STALL;        // needed for write data otherwise we lose the data in the WB_FSM
+          end
         end
       end
       STALL: begin
-        if (!req_valid) begin
+        if (!req_valid
+            || !valid_req_address
+            || ((accepted_len - start_len) == req_len)) begin
           ib_state <= IDLE;
         end
-        else if ((transferred_len == accepted_len) ||
-                  (transferred_len + 'd2 == accepted_len)) begin
-          if (accepted_len == req_len)
-            ib_state <= IDLE;
-          else begin
+        else if ((accepted_len - transferred_len) <= 'd2) begin
             if ((wb_state == IDLE) && (accepted_len == transferred_len)) begin  // if wb_fsm just finished a transaction, accepted_len must start from 0
               req_addr_q   <= 32'h0000_0000;
-              accepted_len <= 'd0;
             end
             ib_state <= ACCEPT;
-          end
         end
       end
     endcase
@@ -131,7 +131,7 @@ localparam FINISH = 2'b10;
 
 wire wb_pending;
 
-assign wb_pending = (accepted_len != 0) && (transferred_len < accepted_len);
+assign wb_pending = req_accepted && (transferred_len < accepted_len);
 
 always @(posedge clk) begin
   if (rst) begin
@@ -160,12 +160,9 @@ always @(posedge clk) begin
         wb_cti <= 3'b000;
         wb_bte <= 2'b00;
 
-        if (accepted_len == 0)
-          transferred_len <= 'd0;
-
         if (wb_pending) begin
           wb_state <= ACTIVE;
-          transferred_len <= 'd0;
+          transferred_len <= start_len;
           wb_cyc <= 1'b1;
           wb_stb <= 1'b1;
           wb_we <= req_we;
@@ -185,7 +182,8 @@ always @(posedge clk) begin
 
           transferred_len <= transferred_len + 'd1;
 
-          if ((transferred_len + 'd1) >= accepted_len) begin
+          if (((accepted_len - start_len) == 'd1)
+            && (transferred_len + 'd1) >= accepted_len) begin
             // Last accepted/granted beat has just completed.
             wb_cyc   <= 1'b0;
             wb_stb   <= 1'b0;
@@ -195,7 +193,7 @@ always @(posedge clk) begin
             // More already-granted beats remain.
             wb_adr <= wb_adr + 'd4;
 
-            if ((transferred_len + 'd2) >= accepted_len) begin
+            if ((transferred_len + 'd1) >= accepted_len) begin
               wb_cti <= 3'b111;   // next accepted beat is the last one
               wb_state <= FINISH;
             end
@@ -209,14 +207,14 @@ always @(posedge clk) begin
           resp_rdata <= wb_dat_r;
           resp_valid <= 1'b1;
           wb_dat_w <= req_wdata;
-          wb_adr <= req_addr_q;
+          wb_adr <= 32'h0000_0000;
           transferred_len <= transferred_len + 'd1;
-          wb_cyc <= 1'b0;
-          wb_stb <= 1'b0;
-          wb_cti <= 3'b000;
-          wb_bte <= 2'b00;
-          wb_state <= IDLE;
         end
+        wb_cyc <= 1'b0;
+        wb_stb <= 1'b0;
+        wb_cti <= 3'b000;
+        wb_bte <= 2'b00;
+        wb_state <= IDLE;
       end
     endcase
   end
