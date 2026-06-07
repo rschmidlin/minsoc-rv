@@ -45,7 +45,6 @@ module ibex_wb_host_adapter (
     output reg [ 1:0] wb_bte
 );
 
-
 wire req_accepted;
 wire [31:0] next_address;
 wire valid_req_address;
@@ -56,9 +55,15 @@ reg [3:0] accepted_len;
 reg [31:0] req_addr_q;
 reg gnt_q;
 
+reg wb_new_cycle_req;
+reg [3:0] wb_new_cycle_len;
+
 assign req_accepted = (accepted_len != start_len);
 assign next_address = req_addr_q + 'd4;
 assign valid_req_address = (req_addr == next_address);
+
+wire [3:0] transfer_remaining_len = accepted_len - transferred_len;
+wire [3:0] accepted_len_in_window = accepted_len - start_len;
 
 localparam IDLE = 2'b00;
 localparam ACCEPT = 2'b01;
@@ -75,6 +80,8 @@ always @(posedge clk) begin
     gnt_q <= 1'b0;
     accepted_len <= 'd0;
     start_len <= 'd0;
+    wb_new_cycle_req <= 1'b0;
+    wb_new_cycle_len <= 'd0;
   end
   else begin
     case (ib_state)
@@ -86,33 +93,34 @@ always @(posedge clk) begin
         end
         if (req_valid && !wb_cyc) begin
           ib_state <= ACCEPT;
+          wb_new_cycle_req <= 1'b0;
         end
       end
       ACCEPT: begin
         gnt_q <= 1'b0;
-        if (req_valid 
+        if (transfer_remaining_len > 'd2) begin
+          ib_state <= STALL;        // needed for write data otherwise we lose the data in the WB_FSM
+        end
+        else if (req_valid 
         && (!req_accepted 
         || valid_req_address)) begin
           accepted_len <= accepted_len + 'd1;
           req_addr_q <= req_addr;
           gnt_q <= 1'b1;
         end
-        else begin
-          if (!gnt_q) begin  // after gnt is cleared new address is there, STALL if no request or address
+        else if (!gnt_q) begin  // after gnt is cleared new address is there, STALL if no request or address
             ib_state <= STALL;
-          end
-          if ((accepted_len - transferred_len) > 'd2) begin
-            ib_state <= STALL;        // needed for write data otherwise we lose the data in the WB_FSM
-          end
+            wb_new_cycle_req <= !valid_req_address;
+            wb_new_cycle_len <= accepted_len;
         end
       end
       STALL: begin
         if (!req_valid
             || !valid_req_address
-            || ((accepted_len - start_len) == req_len)) begin
+            || (accepted_len_in_window == req_len)) begin
           ib_state <= IDLE;
         end
-        else if ((accepted_len - transferred_len) <= 'd2) begin
+        else if (transfer_remaining_len <= 'd2) begin
             if ((wb_state == IDLE) && (accepted_len == transferred_len)) begin  // if wb_fsm just finished a transaction, accepted_len must start from 0
               req_addr_q   <= 32'h0000_0000;
             end
@@ -131,7 +139,10 @@ localparam FINISH = 2'b10;
 
 wire wb_pending;
 
-assign wb_pending = req_accepted && (transferred_len < accepted_len);
+assign wb_pending = req_accepted && (transferred_len != accepted_len);
+
+wire [3:0] new_cycle_req_len = wb_new_cycle_len - transferred_len;
+wire [3:0] accepted_len_since_last_idle = accepted_len - start_len;
 
 always @(posedge clk) begin
   if (rst) begin
@@ -162,7 +173,7 @@ always @(posedge clk) begin
 
         if (wb_pending) begin
           wb_state <= ACTIVE;
-          transferred_len <= start_len;
+          //transferred_len <= start_len;
           wb_cyc <= 1'b1;
           wb_stb <= 1'b1;
           wb_we <= req_we;
@@ -182,8 +193,11 @@ always @(posedge clk) begin
 
           transferred_len <= transferred_len + 'd1;
 
-          if (((accepted_len - start_len) == 'd1)
-            && (transferred_len + 'd1) >= accepted_len) begin
+          // If only one req was accepted or ib_fsm stopped, interrupt operation
+          if ((wb_new_cycle_req && (new_cycle_req_len <= 'd2))
+             || ((((ib_state == IDLE)
+                || (accepted_len_since_last_idle == 'd1))
+                && (transfer_remaining_len <= 'd2)))) begin
             // Last accepted/granted beat has just completed.
             wb_cyc   <= 1'b0;
             wb_stb   <= 1'b0;
@@ -193,7 +207,7 @@ always @(posedge clk) begin
             // More already-granted beats remain.
             wb_adr <= wb_adr + 'd4;
 
-            if ((transferred_len + 'd1) >= accepted_len) begin
+            if (transfer_remaining_len <= 'd2) begin
               wb_cti <= 3'b111;   // next accepted beat is the last one
               wb_state <= FINISH;
             end

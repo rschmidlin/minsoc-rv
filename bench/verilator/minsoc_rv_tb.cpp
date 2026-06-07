@@ -283,6 +283,9 @@ int main(int argc, char **argv, char **env)
 	printf("Simulation ended at PC = %08x (%lu)\n",
 	       ex_pc, tbUtils->getTime());
 
+    fclose(data_file);
+    fclose(instr_file);
+
 	delete tbUtils;
 	exit(0);
 }
