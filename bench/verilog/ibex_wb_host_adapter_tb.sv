@@ -149,7 +149,6 @@ module ibex_wb_host_adapter_tb;
         @(posedge clk);
         if (gnt) begin
           req_valid <= 1'b0;
-          @(posedge clk); // TODO: remove this after test_window_reset_after_drained_burst works
           disable request_until_grant;
         end
       end
@@ -206,7 +205,7 @@ module ibex_wb_host_adapter_tb;
           wb_dat_r <= mem_data_for_addr(stored_addr);
         end
         else begin
-          if (ack_countdown == 0) begin
+          if ((ack_countdown == 0) && (!tmp_ack)) begin
             mem_wb_ack <= 1'b1;
             wb_dat_r <= mem_data_for_addr(wb_adr);
             ack_countdown <= ack_gap;
@@ -279,6 +278,7 @@ module ibex_wb_host_adapter_tb;
 
   task expect_counts(input integer g, input integer r);
     begin
+      $display("Grants seen: %d, responses seen: %d", grants_seen, responses_seen);
       check(grants_seen == g, "unexpected number of grants");
       check(responses_seen == r, "unexpected number of responses");
     end
