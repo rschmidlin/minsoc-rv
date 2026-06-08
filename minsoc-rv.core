@@ -8,10 +8,8 @@ filesets:
   soc_files:
     files:
       - rtl/verilog/minsoc_rv_top.sv
-      - rtl/verilog/ibex_wb_host_adapter.v
       - rtl/verilog/ibex_wb.sv
       - rtl/verilog/minsoc_riscv_dbg.sv
-      - rtl/verilog/wb_ibex_device_adapter.v
     file_type: verilogSource
     depend:
       - "lowrisc:ibex:ibex_top"
@@ -19,6 +17,7 @@ filesets:
       - ">=uart16550-1.5.4"
       - "=wb_ram-1.1-r2026"
       - "timer"
+      - "ibex_wb_adapter"
   verilog_tb_files:
     files:
       - bench/verilog/minsoc_rv_tb.v: {file_type: verilogSource}

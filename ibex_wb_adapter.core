@@ -10,11 +10,12 @@ filesets:
       - rtl/verilog/ibex_wb_host_adapter.v
       - rtl/verilog/wb_ibex_device_adapter.v
     file_type: verilogSource
+    depend:
+      - "fifo"
   verilog_tb_files:
     files:
       - bench/verilog/ibex_wb_host_adapter_tb.sv: {file_type: systemVerilogSource}
     depend:
-      - ::fifo
       - ">=vlog_tb_utils-1.0"
 
 targets:
