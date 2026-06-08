@@ -46,6 +46,23 @@ Next steps:
     7) [ ] Axi-Adapter
     8) [ ] Build with Yosys? 
 
+## Cache
+
+Encountered problems: 
+  - 1) verschlucken von data, weil burst cut because of fifo_req_addr_q != wb_adr @236 ps
+  - 2) attempt to modify to fifo_req_addr != wb_adrr + 4 led to verschlucken von response of address 94 - was already cut with 1
+    Solution: solved by only checking outside of first request
+
+  - 3) @220ps, accepting unrequested accesss to 0x160 from requested 0x15c that should follow with 0x144
+    Solution: remove resp_valid if fifo_empty
+
+  - 4) around 750 ps, on jump from 0x158 to 0x84, lost 0x84 request\
+    Solution: cancel request immediately on non-continuous access
+
+Missing points:
+  - 1) Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
+  - 2) double-check fifo size because it is never full
+
 ## Planned memory mapping
 
 | Region                         | Address                                  |

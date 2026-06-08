@@ -1,0 +1,54 @@
+[*]
+[*] GTKWave Analyzer v3.3.118 (w)1999-2023 BSI
+[*] Mon Jun  8 22:43:03 2026
+[*]
+[dumpfile] "/home/user/workspace/test.vcd"
+[dumpfile_mtime] "Mon Jun  8 22:37:00 2026"
+[dumpfile_size] 114575104
+[savefile] "/home/user/workspace/minsoc-rv/data/data_side.gtkw"
+[timestart] 672
+[size] 1920 1007
+[pos] -1 -1
+*-5.160867 822 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.minsoc_rv_top.
+[treeopen] TOP.minsoc_rv_top.ibex_wb_i.
+[treeopen] TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.
+[treeopen] TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.
+[treeopen] TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.
+[sst_width] 301
+[signals_width] 293
+[sst_expanded] 1
+[sst_vpaned_height] 297
+@28
+TOP.minsoc_rv_top.ibex_wb_i.instr_wb_adapter_i.rst
+TOP.minsoc_rv_top.ibex_wb_i.instr_wb_adapter_i.clk
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.fifo_empty
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.fifo_full
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.fifo_last_beat
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.fifo_rd_en
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.req_valid
+@23
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.req_addr[31:0]
+@28
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.gnt
+@22
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.resp_rdata[31:0]
+@28
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.resp_valid
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.last_beat
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.wb_ack
+@22
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.wb_adr[31:0]
+@28
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.wb_cyc
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.wb_state[1:0]
+@22
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.fifo_req_addr_q[31:0]
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.fifo_req_addr[31:0]
+@28
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.wb_we
+@22
+TOP.minsoc_rv_top.ibex_wb_i.data_wb_adapter_i.wb_dat_w[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

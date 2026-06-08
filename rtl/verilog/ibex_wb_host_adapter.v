@@ -143,10 +143,13 @@ localparam PREPARE = 2'b01;
 localparam ACTIVE = 2'b10;
 localparam FINISH = 2'b11;
 
+// Recognize fifo_empty one read cycle ahead
 reg [31:0] fifo_req_addr_q;
 reg fifo_req_we_q;
 reg [3:0] fifo_req_be_q;
-reg [31:0] fifo_reg_wdata_q;
+reg [31:0] fifo_req_wdata_q;
+
+reg [31:0] wb_adr_q;
 
 always @(posedge clk) begin
   if (rst) begin
@@ -162,7 +165,18 @@ always @(posedge clk) begin
     fifo_rd_en <= 1'b0;
   end
   else begin
+    wb_adr_q <= wb_adr;
+    if (resp_valid) begin
+      //$display("%t RESP: expected_addr=%08x wb_adr=%08x data=%08x",
+      //        $time, fifo_req_addr_q, wb_adr_q, resp_rdata);
+    end
     resp_valid <= 1'b0;  // default every cycle
+
+    fifo_req_we_q <= fifo_req_we;
+    fifo_req_be_q <= fifo_req_be;
+    fifo_req_wdata_q <= fifo_req_wdata;
+    fifo_req_addr_q <= fifo_req_addr;
+
     case (wb_state)
       IDLE: begin
         fifo_rd_en <= 1'b0;
@@ -178,26 +192,16 @@ always @(posedge clk) begin
 
         if (!fifo_empty) begin
           fifo_rd_en <= 1'b1;
-          fifo_req_we_q <= fifo_req_we;
-          fifo_req_be_q <= fifo_req_be;
-          fifo_reg_wdata_q <= fifo_req_wdata;
-          fifo_req_addr_q <= fifo_req_addr;
           wb_state <= PREPARE;
         end
       end
       PREPARE: begin        
         fifo_rd_en <= 1'b0;
-        
-        fifo_req_we_q <= fifo_req_we;
-        fifo_req_be_q <= fifo_req_be;
-        fifo_reg_wdata_q <= fifo_req_wdata;
-        fifo_req_addr_q <= fifo_req_addr;
-
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
         wb_we <= fifo_req_we_q;
         wb_adr <= fifo_req_addr_q;
-        wb_dat_w <= fifo_reg_wdata_q;
+        wb_dat_w <= fifo_req_wdata_q;
         wb_sel <= fifo_req_be_q;
         if (!fifo_last_beat && !fifo_req_we_q) begin
           wb_cti <= 3'b010;
@@ -211,26 +215,26 @@ always @(posedge clk) begin
         if (wb_ack) begin
           resp_rdata <= wb_dat_r;
           resp_valid <= 1'b1;
-          wb_dat_w <= fifo_reg_wdata_q;
+          wb_dat_w <= fifo_req_wdata_q;
 
-          // If only one req was accepted or ib_fsm stopped, interrupt operation
-          if (fifo_empty) begin
+          // If address of next beat is not sequential
+          // ignorring first ack that will have initial address,
+          // then interrupt burst after this beat
+          if (fifo_empty || (!fifo_rd_en && (fifo_req_addr != (wb_adr + 'd4)))) begin
             // Last accepted/granted beat has just completed.
             wb_cyc   <= 1'b0;
             wb_stb   <= 1'b0;
             wb_cti   <= 3'b000;
+            resp_valid <= !fifo_rd_en;  // avoid resp_valid if burst was interrupted
             wb_state <= IDLE;
           end else begin
             fifo_rd_en <= 1'b1;
-            fifo_req_we_q <= fifo_req_we;
-            fifo_req_be_q <= fifo_req_be;
-            fifo_reg_wdata_q <= fifo_req_wdata;
-            fifo_req_addr_q <= fifo_req_addr;
             // More already-granted beats remain.
             wb_adr <= wb_adr + 'd4;
 
-            if (fifo_last_beat || (fifo_req_addr_q != wb_adr)) begin
+            if (fifo_last_beat) begin
               wb_cti <= 3'b111;   // next accepted beat is the last one
+              resp_valid <= 1'b1;
               wb_state <= FINISH;
             end
             else
@@ -244,7 +248,7 @@ always @(posedge clk) begin
           fifo_rd_en <= 1'b1;
           resp_rdata <= wb_dat_r;
           resp_valid <= 1'b1;
-          wb_dat_w <= fifo_reg_wdata_q;
+          wb_dat_w <= fifo_req_wdata_q;
           wb_adr <= 32'h0000_0000;
         end
         wb_cyc <= 1'b0;
