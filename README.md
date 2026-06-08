@@ -63,6 +63,9 @@ Missing points:
   - 1) Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
   - 2) double-check fifo size because it is never full
   - 3) fifo_last_beat logic seems not to work, maybe related to point nr. 2
+  - 4) req_len logic is meaningless, maybe remove
+  - 5) test if it works without activated cache
+  - 6) Adapt wb_ibex_device_adapter to work with host burst requests
 
 ## Planned memory mapping
 
