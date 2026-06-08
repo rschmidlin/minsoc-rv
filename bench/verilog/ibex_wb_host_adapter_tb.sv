@@ -391,7 +391,6 @@ module ibex_wb_host_adapter_tb;
 
       // Keep target valid until it is eventually granted.
       while (!gnt) @(posedge clk);
-      @(posedge clk);
       req_valid <= 1'b0;
 
       wait_responses(3, 120);
@@ -470,7 +469,6 @@ module ibex_wb_host_adapter_tb;
   task test_window_reset_after_drained_burst;
     integer g_before;
     integer r_before;
-    reg [31:0] stored_adr;
     begin
       start_test("drained burst window resets before immediately accepting next request");
 
@@ -496,6 +494,10 @@ module ibex_wb_host_adapter_tb;
 
           @(posedge clk);
           req_valid <= 1'b1;
+
+          // Second grant: 0x5a8
+          while (!gnt) @(posedge clk);
+          req_valid <= 1'b0;
           
           // Wait until second response was observed. At this point the previous window
           // is drained. The next grant must be accounted as a fresh request, not as a
@@ -504,44 +506,45 @@ module ibex_wb_host_adapter_tb;
 
           g_before = grants_seen;
           r_before = responses_seen;
-          check(g_before == 1, "expected exactly one grant before new window");
+          check(g_before == 2, "expected exactly two grants before new window");
           check(r_before == 1, "expected exactly one response before new window");
-
-          // Second grant: 0x5a8
-          while (!gnt) @(posedge clk);
 
           // Keep Ibex asking for the next sequential word while the old window drains.
           req_addr <= 32'h0000_05ac;
 
           // Keep next request valid. The adapter should eventually grant it.
           @(posedge clk);
+          req_valid <= 1'b1;
+                          
+          while (!gnt) @(posedge clk);
+          req_valid <= 1'b0;
           
           check(grants_seen == g_before + 1,
                 "new request after drained window should create exactly one additional grant");
-          check(granted_addr[g_before] == 32'h0000_05a8,
-                "new grant after drained window should be for next address 0x5a8");
-                
-          while (!gnt) @(posedge clk);
+          check(granted_addr[g_before] == 32'h0000_05ac,
+                "new grant after drained window should be for next address 0x5ac");
         end
         begin
           // Drain exactly the two accepted requests through Wishbone.
-          while (!(wb_cyc && wb_stb)) @(posedge clk);
-
+          while (!(wb_cyc && wb_stb)) @(negedge clk);
           wb_dat_r <= mem_data_for_addr(wb_adr);
           task_wb_ack   <= 1'b1;
-          @(posedge clk);
+          repeat (2) @(posedge clk);
           task_wb_ack   <= 1'b0;
 
           // Wait until first response was observed.
           while (responses_seen < 1) @(posedge clk);
 
-          while (!(wb_cyc && wb_stb)) @(posedge clk);
+          while (!(wb_cyc && wb_stb)) @(negedge clk);
           wb_dat_r <= mem_data_for_addr(wb_adr);
-          stored_adr <= wb_adr;
           task_wb_ack   <= 1'b1;
-          @(posedge clk);
-          wb_dat_r <= mem_data_for_addr(stored_adr+'d4);
-          @(posedge clk);
+          repeat (2) @(posedge clk);
+          task_wb_ack   <= 1'b0;
+          
+          while (!(wb_cyc && wb_stb)) @(negedge clk);
+          wb_dat_r <= mem_data_for_addr(wb_adr);
+          task_wb_ack   <= 1'b1;
+          repeat (2) @(posedge clk);
           task_wb_ack   <= 1'b0;
         end
       join
