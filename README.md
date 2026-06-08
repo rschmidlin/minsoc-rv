@@ -66,6 +66,7 @@ Missing points:
   - 4) req_len logic is meaningless, maybe remove
   - 5) test if it works without activated cache
   - 6) Adapt wb_ibex_device_adapter to work with host burst requests
+  - 7) Check if ib_fsm could be replaced by Ibex directly connected to FIFO req_valid <-> wr_en
 
 ## Planned memory mapping
 
