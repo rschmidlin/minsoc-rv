@@ -89,6 +89,7 @@ module ibex_wb_host_adapter_tb;
   integer    responses_seen;
   integer    errors;
   integer    test_no;
+  reg [1023:0] testcase_filter;
 
   // Capture WB write-side signals for write-request checks.
   reg [31:0] cap_wb_dat_w;
@@ -645,24 +646,30 @@ module ibex_wb_host_adapter_tb;
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
+  // +testcase=<tag> selects a single test; omitting the plusarg runs all.
+  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12
+  // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
     test_no = 0;
 
-    test_classic_single_read();
-    test_classic_single_write();
-    test_burst_continuous_ack();
-    test_burst_slave_waitstates();
-    test_resp_valid_deasserts_between_wb_acks();
-    test_ibex_req_gap();
-    test_fifo_full_backpressure();
-    test_address_break_after_drained_burst();
-    test_address_break_while_fifo_nonempty();
-    test_address_break_while_wb_active();
-    test_address_break_request_retained();
-    test_no_resp_valid_when_fifo_empty();
-    test_first_beat_not_cut();
-    test_later_beats_cut_correctly();
+    if (!$value$plusargs("testcase=%s", testcase_filter))
+      testcase_filter = "";
+
+    if (testcase_filter == "" || testcase_filter == "C1")   test_classic_single_read();
+    if (testcase_filter == "" || testcase_filter == "C2")   test_classic_single_write();
+    if (testcase_filter == "" || testcase_filter == "C3")   test_burst_continuous_ack();
+    if (testcase_filter == "" || testcase_filter == "C4")   test_burst_slave_waitstates();
+    if (testcase_filter == "" || testcase_filter == "C4r")  test_resp_valid_deasserts_between_wb_acks();
+    if (testcase_filter == "" || testcase_filter == "C5")   test_ibex_req_gap();
+    if (testcase_filter == "" || testcase_filter == "C6")   test_fifo_full_backpressure();
+    if (testcase_filter == "" || testcase_filter == "supp") test_address_break_after_drained_burst();
+    if (testcase_filter == "" || testcase_filter == "C7")   test_address_break_while_fifo_nonempty();
+    if (testcase_filter == "" || testcase_filter == "C8")   test_address_break_while_wb_active();
+    if (testcase_filter == "" || testcase_filter == "C9")   test_address_break_request_retained();
+    if (testcase_filter == "" || testcase_filter == "C10")  test_no_resp_valid_when_fifo_empty();
+    if (testcase_filter == "" || testcase_filter == "C11")  test_first_beat_not_cut();
+    if (testcase_filter == "" || testcase_filter == "C12")  test_later_beats_cut_correctly();
 
     if (errors == 0)
       $display("\nPASS: all ibex_wb_host_adapter tests passed");
