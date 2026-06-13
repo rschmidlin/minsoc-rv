@@ -42,7 +42,7 @@ Next steps:
     3) [X] Set license
     4) [X] Re-organize base addresses
     5) [X] Clean-up unused wires and file formatting
-    6) [ ] Cache
+    6) [X] Cache
     7) [ ] Axi-Adapter
     8) [ ] Build with Yosys? 
 
@@ -60,14 +60,15 @@ Encountered problems:
     Solution: cancel request immediately on non-continuous access
 
 Missing points:
-  - 1) Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
-  - 2) double-check fifo size because it is never full
-  - 3) fifo_last_beat logic seems not to work, maybe related to point nr. 2
-  - 4) req_len logic is meaningless, maybe remove
-  - 5) test if it works without activated cache
-  - 6) Adapt wb_ibex_device_adapter to work with host burst requests
-  - 7) Check if ib_fsm could be replaced by Ibex directly connected to FIFO req_valid <-> wr_en
-  - 8) Only negate gnt if fifo_full, requires that wr_en is based on both req_valid and gnt
+  - 1) [X] Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
+  - 2) [X] double-check fifo size because it is never full
+  - 3) [ ] fifo_last_beat logic seems not to work, maybe related to point nr. 2
+  - 4) [ ] req_len logic is meaningless, maybe remove
+  - 5) [ ] test if it works without activated cache
+  - 6) [ ] Adapt wb_ibex_device_adapter to work with host burst requests
+  - 7) [ ] Check if ib_fsm could be replaced by Ibex directly connected to FIFO req_valid <-> wr_en
+  - 8) [ ] Only negate gnt if fifo_full, requires that wr_en is based on both req_valid and gnt
+  - 9) [ ] Rename top_nexyssa7.sv to top_xilinx.sv? 
 
 ## Planned memory mapping
 

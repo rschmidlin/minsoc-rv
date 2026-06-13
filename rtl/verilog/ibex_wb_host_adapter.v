@@ -51,11 +51,11 @@ wire last_beat;
 reg fifo_wr_en;
 reg fifo_rd_en;
 wire fifo_full, fifo_empty;
-reg fifo_last_beat;
-reg fifo_req_we;
-reg [3:0] fifo_req_be;
-reg [31:0] fifo_req_wdata;
-reg [31:0] fifo_req_addr;
+wire fifo_last_beat;
+wire fifo_req_we;
+wire [3:0] fifo_req_be;
+wire [31:0] fifo_req_wdata;
+wire [31:0] fifo_req_addr;
 
 // Store req_addr & req_be 
 fifo_fwft #(
