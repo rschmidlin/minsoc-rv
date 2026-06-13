@@ -104,6 +104,24 @@ module ibex_wb_host_adapter_tb;
     end
   end
 
+  // R10: burst-abort protocol assertion.
+  // CYC must not deassert directly from a burst beat (CTI=010).
+  // The required sequence is: CTI=010 → CYC=1/STB=0/CTI=111 → CYC=0.
+  reg        wb_cyc_r;
+  reg [2:0]  wb_cti_r;
+
+  always @(posedge clk) begin
+    if (rst) begin
+      wb_cyc_r <= 1'b0;
+      wb_cti_r <= 3'b000;
+    end else begin
+      if (wb_cyc_r && !wb_cyc && wb_cti_r == 3'b010)
+        fail("R10: burst aborted without CYC=1/STB=0/CTI=111 graceful-abort cycle");
+      wb_cyc_r <= wb_cyc;
+      wb_cti_r <= wb_cti;
+    end
+  end
+
   task fail(input [1023:0] msg);
     errors = errors + 1;
     $display("FAIL t=%0t: %0s", $time, msg);

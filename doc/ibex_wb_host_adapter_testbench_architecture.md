@@ -82,13 +82,25 @@ next_addr == current_addr + 4
 
 If the next queued request is not sequential, the current Wishbone burst must be terminated gracefully.
 
-For Wishbone B4-style burst termination:
+For Wishbone B3-style burst termination:
 
 ```text
 wb_cti = 3'b111 on the final effective beat
 ```
 
 If a queued request should not belong to the current burst, the adapter must not consume or acknowledge it as part of that burst.
+
+### Burst abortion
+
+When a burst is cut short before its natural end (e.g., an address break interrupts an in-progress burst), the master must signal the abort with exactly one graceful-abort cycle before deasserting CYC:
+
+```text
+CYC=1, STB=0, CTI=3'b111
+```
+
+This is distinct from normal burst termination, where the final data beat carries CTI=111 and STB=1 simultaneously with the last transfer. In the abort case there is no additional data transfer — STB=0 conveys only the end-of-burst signal.
+
+CYC must never fall directly from an active burst beat (CTI=010) to zero without this intermediate cycle.
 
 ---
 
@@ -179,6 +191,15 @@ On an address break, the adapter must prevent stale/wrong-path entries from bein
 ### R9: Wishbone ACK must not create an unrequested response
 
 A `wb_ack` may produce `resp_valid` only if there is a corresponding outstanding FIFO entry.
+
+### R10: Burst abortion must use a graceful-abort cycle
+
+When the adapter terminates a burst early it must assert one cycle of `CYC=1, STB=0, CTI=111` before deasserting CYC. CYC must not transition directly from a burst beat (CTI=010) to deasserted.
+
+```text
+illegal:   CTI=010, CYC=1, STB=1  →  CYC=0
+required:  CTI=010, CYC=1, STB=1  →  CTI=111, CYC=1, STB=0  →  CYC=0
+```
 
 ---
 
@@ -690,6 +711,7 @@ Maps to: C7, C8, C9
 7. Instantiate `vlog_tb_utils` for VCD, timeout, and heartbeat handling; do not roll your own plusarg VCD code.
 8. In a burst-capable slave model, maintain an internal `slave_adr` counter and never use `wb_adr` directly for `wb_dat_r` in burst continuation. The DUT advances `wb_adr` via NBA at the same posedge the slave evaluates, so `wb_adr` in the evaluation phase still shows the previous beat's address.
 9. Use `ack_beats = -1` to mean unlimited acks, `N > 0` for exactly N acks. Decrement with a blocking assignment inside the slave always block so the change is immediate within that evaluation. Tasks write `ack_beats` between clock edges; the always block writes it at posedge — no simultaneous conflict.
+10. Assert that CYC never deasserts directly from a burst beat (CTI=010). Register one-cycle delayed copies of `wb_cyc` and `wb_cti` and check at every posedge: if the previous cycle was a burst beat (`wb_cyc_r && wb_cti_r == 3'b010`) and CYC is now 0, that is a protocol violation (R10).
 
 ---
 
