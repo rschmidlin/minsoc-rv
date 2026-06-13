@@ -28,17 +28,11 @@
    
 ## Following requirements for Wishbone to Ibex:
    
-   (I) WB_ADR and req_valid shall have the same timing
-   (II) GNT is set one cycle after req_valid
-   (III) resp_valid comes one cycle after GNT
-   (IV) STB or resp_valid can add wait cycles
+  This is a Wishbone to Ibex adapter and the Ibex interface behaves like a memory that responds to req_addr with one cycle delay. `req_valid` can only be asserted when the address is valid. Then, we have to wait one cycle until the data arrives, trigger wb_ack and next cycle present the new address. 
 
-### Additional:
-   1. WB_ADR and Ibex req_valid may align only when WB_CYC && WB_STB.
-   2. If WB_STB drops before Ibex GNT, cancel/hold; do not emit late GNT.
-   3. ACK should correspond to Ibex resp_valid.
-   4. WB wait states are added by holding ACK low.
-   5. Ibex-side wait states are handled by delaying ACK.
+   (I) req_addr and req_valid shall have the same timing, one cycle after (wb_cyc&wb_stb)/wb_adr
+   (II) resp_rdata arrives one cycle later matching resp_rdata timing
+   (III) wb_ack is simply req_valid with a cycle delay
 
    
 ## Ibex to Wishbone: 
