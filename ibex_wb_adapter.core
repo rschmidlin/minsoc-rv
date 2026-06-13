@@ -35,10 +35,3 @@ targets:
   sim:
     <<: *default
     description: Simulate the design
-
-parameters:
-  vcd:
-    datatype   : str
-    description: File name to dump VCD to
-    paramtype  : plusarg
-    scope      : private
