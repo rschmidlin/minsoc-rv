@@ -222,14 +222,7 @@ module minsoc_riscv_dbg #(
 
   assign slave_wb_err_o = 1'b0;  // no error for now
 
-  // dm_top slave_rdata_o is combinatorial; one-cycle delay of req_valid is resp_valid
-  reg slave_resp_valid_r;
-  always @(posedge clk_i) begin
-    if (!rst_ni) slave_resp_valid_r <= 1'b0;
-    else         slave_resp_valid_r <= slave_req_valid;
-  end
-
-  /*
+/*
  * Slave Ibex adapter
  */
   wb_ibex_device_adapter wb_ibex_device_adapter_i (
@@ -251,13 +244,11 @@ module minsoc_riscv_dbg #(
       // Request
       .req_valid(slave_req_valid),
       .req_addr(slave_req_addr),
-      .req_len(),
       .req_we(slave_req_we),
       .req_wdata(slave_req_wdata),
       .req_be(slave_req_be),
 
       // Response
-      .resp_valid(slave_resp_valid_r),
       .resp_rdata(slave_resp_rdata)
   );
 

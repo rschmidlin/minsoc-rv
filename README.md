@@ -67,6 +67,7 @@ Missing points:
   - 5) test if it works without activated cache
   - 6) Adapt wb_ibex_device_adapter to work with host burst requests
   - 7) Check if ib_fsm could be replaced by Ibex directly connected to FIFO req_valid <-> wr_en
+  - 8) Only negate gnt if fifo_full, requires that wr_en is based on both req_valid and gnt
 
 ## Planned memory mapping
 
