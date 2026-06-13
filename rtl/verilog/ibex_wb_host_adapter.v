@@ -218,15 +218,15 @@ always @(posedge clk) begin
           wb_dat_w <= fifo_req_wdata_q;
 
           // If address of next beat is not sequential
-          // ignorring first ack that will have initial address,
+          // ignoring first ack that will have initial address,
           // then interrupt burst after this beat
           if (fifo_empty || (!fifo_rd_en && (fifo_req_addr != (wb_adr + 'd4)))) begin
             // Last accepted/granted beat has just completed.
-            wb_cyc   <= 1'b0;
+            wb_cyc   <= 1'b1;
             wb_stb   <= 1'b0;
-            wb_cti   <= 3'b000;
+            wb_cti   <= 3'b111;
             resp_valid <= !fifo_rd_en;  // avoid resp_valid if burst was interrupted
-            wb_state <= IDLE;
+            wb_state <= FINISH;
           end else begin
             fifo_rd_en <= 1'b1;
             // More already-granted beats remain.
@@ -244,7 +244,7 @@ always @(posedge clk) begin
       end
       FINISH: begin
         fifo_rd_en <= 1'b0;
-        if (wb_ack) begin
+        if (wb_ack && wb_stb) begin
           fifo_rd_en <= 1'b1;
           resp_rdata <= wb_dat_r;
           resp_valid <= 1'b1;

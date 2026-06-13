@@ -35,7 +35,6 @@ module wb_ibex_device_adapter (
 );
 
 wire wb_valid = wb_cyc & wb_stb;
-wire wb_last  = (wb_cti == 3'b000) || (wb_cti == 3'b111);
 
 always @(posedge clk) begin
   if (rst) begin
@@ -51,7 +50,7 @@ always @(posedge clk) begin
     end
 
     // one-cycle delayed completion
-    wb_ack <= req_valid/* TODO: enable after correction of ibex_wb_adapter & ~wb_last*/;
+    wb_ack <= req_valid;
   end
 end
 

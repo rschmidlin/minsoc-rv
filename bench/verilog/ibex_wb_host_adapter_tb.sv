@@ -651,7 +651,7 @@ module ibex_wb_host_adapter_tb;
       join
       expect_counts(3, 3);
       @(posedge clk);  // wb_cyc NBA from final-beat termination settles here
-      check(!wb_cyc, "burst must terminate after last sequential beat");
+      check(!wb_stb, "burst must terminate after last sequential beat");
       // Non-sequential follow-up must start a fresh WB cycle.
       issue_read(32'h0000_0200);
       wait_responses(4, 60);
