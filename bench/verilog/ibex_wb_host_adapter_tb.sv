@@ -928,11 +928,81 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+  // C13: fifo_empty in the middle of a burst (no non-sequential terminator)
+  //
+  // C7/C8 always end a burst with a *real* non-sequential entry, so burst_valid
+  // goes false because the live FIFO head is non-contiguous.  Neither test
+  // exercises the case where a burst must stop simply because the FIFO ran dry
+  // while every queued address was sequential.
+  //
+  // That is the case this test isolates.  All queued addresses are sequential,
+  // so the ONLY reason the burst may terminate is the FIFO becoming empty in the
+  // middle of the burst.  The slave acks continuously, so a DUT that keeps
+  // bursting whenever burst_valid reads true will over-run the queue and emit a
+  // phantom response for an address that was never requested.
+  //
+  // burst_valid (RTL) is `fifo_req_addr == fifo_req_addr_q + 4`.  When the FWFT
+  // FIFO empties, its dout holds the STALE last entry (fifo_fwft_adapter only
+  // updates dout_o on a real pop), so burst_valid is a function of stale data
+  // once the queue is dry.  The architecture's burst-termination rule (doc §4,
+  // R6/R7) requires the burst to stop when no further sequential *stored* request
+  // exists -- emptiness, not just a non-contiguous head, must end the burst.
+  //
+  // Method: stall the slave and pile up a deep run of sequential reads so the WB
+  // FSM parks in BURST with several entries queued, then release continuous acks
+  // so the whole run drains as ONE long burst from full to empty.  The scoreboard
+  // fails on any resp_valid without a matching grant; expect_counts pins exactly
+  // one response per granted request.
+  task test_fifo_empty_midburst;
+    integer granted;
+    integer waited;
+    begin
+      start_test("C13: fifo_empty in the middle of a burst (all addresses sequential)");
+      stop_ack();
+
+      // Pile up a deep sequential run while the WB side is stalled.  Grants stop
+      // when the FIFO fills; count however many were actually accepted so the
+      // test does not depend on the exact FIFO/FWFT depth.
+      granted = 0;
+      waited  = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (granted < 6 && waited < 60) begin
+        req_addr = 32'h0000_0800 + granted * 4;   // 0x800, 0x804, 0x808, ...
+        @(posedge clk);
+        if (gnt) granted = granted + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      check(granted >= 3, "C13: need at least a 3-deep sequential run to exercise mid-burst empty");
+
+      // Release the WB side: the adapter bursts through the whole sequential run.
+      // The burst must terminate when the queue empties -- not continue into a
+      // phantom 0x800+granted*4 beat.
+      set_ack_continuous();
+      wait_responses(granted, 120);   // times out if the burst stalls / loses a beat
+      expect_counts(granted, granted);
+
+      // After the queue drains there must be no further response, and the WB
+      // cycle must have closed cleanly (R10 graceful-abort is checked globally).
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0,
+            "C13: phantom resp_valid after FIFO emptied mid-burst");
+      check(!wb_cyc, "C13: WB cycle must close after the burst drains");
+      expect_counts(granted, granted);
+      check(sb_addr[0] == 32'h0000_0800, "C13: first grant 0x800");
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
-  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 L1 GAP P6
+  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 L1 GAP P6
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -957,6 +1027,7 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "C12")  test_later_beats_cut_correctly();
     if (testcase_filter == "" || testcase_filter == "L1")   test_fifo_full_latency();
     if (testcase_filter == "" || testcase_filter == "GAP")  test_fifo_full_with_req_gap();
+    if (testcase_filter == "" || testcase_filter == "C13")  test_fifo_empty_midburst();
     if (testcase_filter == "" || testcase_filter == "P6")   test_finish_no_extra_fifo_rd_en();
 
     if (errors == 0)
