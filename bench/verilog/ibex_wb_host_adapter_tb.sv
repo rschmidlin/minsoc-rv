@@ -300,24 +300,26 @@ module ibex_wb_host_adapter_tb;
     integer   waited;
     reg [31:0] cur_addr;
     begin
-      remaining = count - 1;
+      remaining = count;
       waited    = 0;
       cur_addr  = base_addr;
       @(negedge clk);
       req_valid = 1'b1;
-      req_addr  = cur_addr;
-      @(negedge clk);
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      // The loop drives req_addr and samples gnt from the very first posedge
+      // after req_valid is asserted, so every grant — including the first —
+      // is observed and counted here. Splitting the first request out into a
+      // separate pre-loop step would leave a posedge unobserved by this loop
+      // while the global scoreboard still counts it, causing grants_seen to
+      // run ahead of remaining/gnt tracking (see C6 for the bug this caused).
       while (remaining > 0 && waited < max_cycles) begin
-        req_valid = 1'b1;
-        req_addr  = cur_addr;
-        req_we    = 1'b0;
-        req_be    = 4'hf;
-        req_wdata = 32'h0;
+        req_addr = cur_addr;
         @(posedge clk);
         if (gnt) begin
           remaining = remaining - 1;
           cur_addr  = cur_addr + 32'd4;
-          req_addr = cur_addr;
         end
         waited = waited + 1;
         @(negedge clk);
@@ -364,15 +366,9 @@ module ibex_wb_host_adapter_tb;
 
   task wait_responses(input integer n, input integer max_cycles);
     integer i;
-    reg responses_nr_reached;
-    responses_nr_reached = 1'b0;
-    for (i = 0; (i < max_cycles && !responses_nr_reached); i = i + 1) begin
+    for (i = 0; i < max_cycles; i = i + 1) begin
       @(negedge clk);
-      if (responses_seen >= n) responses_nr_reached = 1'b1;
-    end
-    if (responses_nr_reached) begin
-      @(negedge clk)
-      disable wait_responses;
+      if (responses_seen >= n) disable wait_responses;
     end
     fail("wait_responses: timeout");
   endtask
@@ -505,20 +501,22 @@ module ibex_wb_host_adapter_tb;
       // observes a properly sequential next address and never stalls due to
       // an address gap.  Run for 20 cycles — enough for a depth-4 FIFO to
       // saturate (5 grants × 2 cycles/grant = 10 cycles, plus margin).
+      //
+      // The loop must see the very first posedge after req_valid is
+      // asserted: splitting that first request into a separate step before
+      // the loop (as a previous version of this test did) leaves a posedge
+      // unobserved by gnt_count while the global scoreboard's grants_seen
+      // still counts it, so the FIFO silently accepts one more grant than
+      // this task tracks.
       @(negedge clk);
       req_valid = 1'b1;
-      req_addr  = 32'h0000_0600 + (gnt_count * 4);
       req_we    = 1'b0;
       req_be    = 4'hf;
       req_wdata = 32'h0;
-      @(negedge clk);
       for (i = 0; i < 20; i = i + 1) begin
-        req_addr  = 32'h0000_0600 + (gnt_count * 4);
+        req_addr = 32'h0000_0600 + (gnt_count * 4);
         @(posedge clk);
-        if (gnt) begin
-          gnt_count = gnt_count + 1;
-          req_addr  = 32'h0000_0600 + (gnt_count * 4);
-        end
+        if (gnt) gnt_count = gnt_count + 1;
         @(negedge clk);
       end
       req_valid = 1'b0;
