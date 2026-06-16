@@ -26,13 +26,31 @@
    1. Every resp_valid cycle must match a previous granted request
    2. Continue WB burst only while granted addresses are sequential
    
-## Following requirements for Wishbone to Ibex:
-   
-  This is a Wishbone to Ibex adapter and the Ibex interface behaves like a memory that responds to req_addr with one cycle delay. `req_valid` can only be asserted when the address is valid. Then, we have to wait one cycle until the data arrives, trigger wb_ack and next cycle present the new address. 
+## Following requirements for Wishbone to Debug Memory
 
-   (I) req_addr and req_valid shall have the same timing, one cycle after (wb_cyc&wb_stb)/wb_adr
-   (II) resp_rdata arrives one cycle later matching resp_rdata timing
-   (III) wb_ack is simply req_valid with a cycle delay
+This adapter maps Wishbone accesses to the dm_top/dm_mem slave interface.
+The downstream interface behaves as a local memory with fixed one-cycle
+read latency.
+
+A Wishbone access is translated into a one-cycle req_valid pulse.
+The corresponding read data becomes available one cycle later.
+wb_ack is asserted when the corresponding response data is available.
+
+(I) req_addr and req_valid shall have the same timing and shall be asserted
+    one cycle after acceptance of a Wishbone request (wb_cyc & wb_stb).
+
+(II) resp_rdata shall correspond to the req_addr presented in the previous
+     cycle.
+
+(III) wb_ack shall be asserted one cycle after req_valid.
+
+(IV) For read accesses, wb_dat_r shall be valid when wb_ack is asserted.
+
+(V) For write accesses, wb_ack shall acknowledge completion of the
+    corresponding req_valid request.
+
+(VI) For burst accesses, the next req_addr shall only be generated after
+     the previous access has been acknowledged.
 
    
 ## Ibex to Wishbone: 
@@ -54,16 +72,19 @@
 control transactions on Ibex side. Can stall on WB side by negating ACK. 
   Can stall on Ibex side by delaying REQ.
         
-   | Signal | 0   | 1   | 2   | 3   | 4   | 5   | 6   | 7    | 8  | 9  |
-   |--------+-----+-----+-----+-----+-----+-----+-----+------+----+----|
-   | CYC    | 1   | 1   | 1   | 1   | 1   | 1   | 1   | 1    | 0  | 0  |
-   | STB    | 1   | 1   | 1   | 0   | 1   | 1   | 1   | 1    | 0  | 0  |
-   | ADR    | D0  | D0  | D1  | -   | D1  | D2  | D3  | D3   | DX | DX |
-   | REQ    | D0  | D0  | D1  | -   | D1  | D2  | D3  | D3   | DX | DX |
-   | GNT    | -   | D0  | -   | -   | D1  | D2  | D3  | -    | -  | -  |
-   | RSP    |     |     | D0  | -   | -   | D1  | D2  | D3   | -  | -  |
-   | ACK    | -   | -   | D0  | 0   | D1  | 0   | D2  | D3   | -  | -  |
-   | CTI    | INC | INC | INC | INC | INC | INC | INC | STOP |    |    |
+Cycle      N      N+1      N+2
+
+WB STB     1       1
+WB ADR     A0      A1
+
+req_valid          1
+req_addr           A0
+
+resp_rdata                 D0
+wb_ack                     1
+
+req_valid                  1
+req_addr                   A1
 
 ### Warnings:
       - unsupported != non-incremental
