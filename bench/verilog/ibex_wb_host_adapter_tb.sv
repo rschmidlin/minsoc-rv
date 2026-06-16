@@ -121,6 +121,29 @@ module ibex_wb_host_adapter_tb;
     end
   end
 
+  // L1: fifo_fwft full-flag set-latency monitor.
+  // The base FIFO's full_o is a combinational function of the registered
+  // read/write pointers, so it should appear on the clock edge *after* the
+  // write that fills it (1-cycle latency).  This monitor records, each time
+  // fifo_full transitions 0->1, whether the most recent filling write was on
+  // the immediately preceding posedge (latency 1) or earlier (latency 2).
+  reg     full_q;
+  reg     fifo_wr_en_q;
+  integer fifo_full_set_latency;
+
+  always @(posedge clk) begin
+    if (rst) begin
+      full_q                <= 1'b0;
+      fifo_wr_en_q          <= 1'b0;
+      fifo_full_set_latency <= -1;
+    end else begin
+      if (!full_q && dut.fifo_full)
+        fifo_full_set_latency <= fifo_wr_en_q ? 1 : 2;
+      full_q       <= dut.fifo_full;
+      fifo_wr_en_q <= dut.fifo_wr_en;
+    end
+  end
+
   task fail(input [1023:0] msg);
     errors = errors + 1;
     $display("FAIL t=%0t: %0s", $time, msg);
@@ -673,11 +696,243 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+  // L1: fifo_fwft full-flag latency
+  // Requests words until the FIFO reports full (depth-4 base FIFO + 3-stage
+  // FWFT output pipeline => 7 outstanding entries before fifo_full; the
+  // adapter also pre-reads two while preparing the WB cycle, so ~9 grants).
+  //
+  // HARD CHECK: fifo_full asserts on the cycle after the filling write
+  // (1-cycle SET latency) -- the property the design assumes.
+  //
+  // EXPERIMENT (reported, not asserted): the user asked to read two words,
+  // write one, and see whether fifo_full reacts "next cycle".  It turns out
+  // the FWFT output pipeline absorbs the first pop(s) internally before the
+  // base FIFO read pointer advances, so fifo_full does NOT clear after only
+  // two pops, and reading two then writing one leaves the FIFO non-full.
+  // The test measures and prints this FWFT pop-to-clear latency so the real
+  // behaviour is visible.
+  task test_fifo_full_latency;
+    integer fill_grants;
+    integer rd_count;
+    integer cyc;
+    begin
+      start_test("L1: fifo_fwft full-flag set latency");
+      stop_ack();   // WB side stalls, so granted requests pile up in the FIFO
+
+      // --- Phase 1: fill the FIFO until fifo_full asserts ---
+      // Hold req_valid asserted, advancing req_addr per grant, until the base
+      // FIFO reports full.  gnt = req_valid & ~fifo_full, so grants stop
+      // exactly when fifo_full asserts.
+      fill_grants = 0;
+      cyc         = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (!dut.fifo_full && cyc < 60) begin
+        req_addr = 32'h0000_0700 + (fill_grants * 4);
+        @(posedge clk);
+        if (gnt) fill_grants = fill_grants + 1;
+        cyc = cyc + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+
+      // fifo_full stays asserted (no pops, no writes), so let the latency
+      // monitor register the 0->1 transition it captured during the fill.
+      @(posedge clk);
+      @(posedge clk);
+
+      check(dut.fifo_full == 1'b1, "L1: FIFO never reached full");
+      $display("  L1: fifo_full after %0d grants; measured set latency = %0d cycle(s)",
+               fill_grants, fifo_full_set_latency);
+      check(fifo_full_set_latency == 1,
+            "L1: fifo_full must assert the cycle after the filling write (1-cycle latency)");
+      check(gnt == 1'b0, "L1: gnt must be deasserted while FIFO is full");
+
+      // --- Phase 2: pop two words, then keep popping until fifo_full clears ---
+      // Re-enable acks so the pending WB cycle advances; each accepted beat
+      // pops one FIFO entry (fifo_rd_en high for one cycle).
+      rd_count = 0;
+      cyc      = 0;
+      set_ack_continuous();
+      while (rd_count < 2 && cyc < 40) begin
+        @(negedge clk);
+        if (dut.fifo_rd_en) rd_count = rd_count + 1;
+        cyc = cyc + 1;
+      end
+      check(rd_count == 2, "L1: expected two FIFO reads");
+      $display("  L1: after %0d pops fifo_full=%b (FWFT output pipeline absorbs the first pops before the base read pointer advances)",
+               rd_count, dut.fifo_full);
+
+      // Keep popping to report the FWFT pop-to-clear latency.
+      while (dut.fifo_full && cyc < 40) begin
+        @(negedge clk);
+        if (dut.fifo_rd_en) rd_count = rd_count + 1;
+        cyc = cyc + 1;
+      end
+      stop_ack();
+      check(!dut.fifo_full, "L1: fifo_full never cleared while draining");
+      $display("  L1: fifo_full cleared after %0d total pops", rd_count);
+
+      // --- Phase 3: write a single word back and observe full-set latency ---
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_addr  = 32'h0000_07f0;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      @(posedge clk);          // single fifo_wr_en here (full is low)
+      @(negedge clk);
+      req_valid = 1'b0;
+
+      cyc = 0;
+      while (!dut.fifo_full && cyc < 5) begin
+        @(posedge clk);
+        cyc = cyc + 1;
+      end
+      if (dut.fifo_full)
+        $display("  L1: single refill write -> fifo_full re-asserted ~%0d cycle(s) later", cyc);
+      else
+        $display("  L1: reading two words then writing one leaves fifo_full deasserted (FIFO has free capacity)");
+
+      // Drain so the response path stays consistent for the run as a whole.
+      set_ack_continuous();
+      repeat (40) @(posedge clk);
+    end
+  endtask
+
+  // GAP: req_valid dropped to 0 just before the filling grant, then
+  // re-asserted.  Verifies no spurious grant during the gap and that fifo_full
+  // still asserts exactly one cycle after the (delayed) filling write -- i.e.
+  // the 1-cycle set latency is independent of req_valid continuity.
+  task test_fifo_full_with_req_gap;
+    integer fill_grants;
+    integer total_to_full;
+    integer cyc;
+    begin
+      start_test("GAP: req_valid gap before last grant");
+      stop_ack();
+
+      // Phase A: discover how many grants are needed to fill (continuous).
+      fill_grants = 0;
+      cyc         = 0;
+      @(negedge clk);
+      req_valid = 1'b1; req_we = 1'b0; req_be = 4'hf; req_wdata = 32'h0;
+      while (!dut.fifo_full && cyc < 60) begin
+        req_addr = 32'h0000_0a00 + (fill_grants * 4);
+        @(posedge clk);
+        if (gnt) fill_grants = fill_grants + 1;
+        cyc = cyc + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      total_to_full = fill_grants;
+      $display("  GAP: continuous fill needs %0d grants", total_to_full);
+
+      // Phase B: refill, but stop one grant short, insert a req_valid gap,
+      // then deliver the final grant.
+      reset_dut();
+      stop_ack();
+      fill_grants = 0;
+      cyc         = 0;
+      @(negedge clk);
+      req_valid = 1'b1; req_we = 1'b0; req_be = 4'hf; req_wdata = 32'h0;
+      while (fill_grants < total_to_full - 1 && cyc < 60) begin
+        req_addr = 32'h0000_0a00 + (fill_grants * 4);
+        @(posedge clk);
+        if (gnt) fill_grants = fill_grants + 1;
+        cyc = cyc + 1;
+        @(negedge clk);
+      end
+      check(dut.fifo_full == 1'b0, "GAP: must not be full one grant short");
+
+      // Gap: drop req_valid for two cycles; no grant, no full must appear.
+      req_valid = 1'b0;
+      repeat (2) begin
+        @(negedge clk);
+        check(gnt == 1'b0,           "GAP: gnt must be 0 while req_valid low");
+        check(dut.fifo_full == 1'b0, "GAP: fifo_full must stay 0 during gap");
+      end
+
+      // Deliver the final (filling) grant on a single req_valid cycle.
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_addr  = 32'h0000_0a00 + (fill_grants * 4);
+      @(posedge clk);                 // filling write sampled here
+      check(gnt == 1'b1, "GAP: final grant must be given when req_valid returns");
+      @(negedge clk);
+      req_valid = 1'b0;
+      check(dut.fifo_full == 1'b1, "GAP: fifo_full must be set the cycle after the filling write");
+
+      // Confirm via the latency monitor too (it latches the 0->1 transition
+      // one posedge after fifo_full asserts, so allow two edges).
+      @(posedge clk);
+      @(posedge clk);
+      $display("  GAP: measured fifo_full set latency = %0d cycle(s)", fifo_full_set_latency);
+      check(fifo_full_set_latency == 1,
+            "GAP: 1-cycle set latency must hold despite the req_valid gap");
+
+      set_ack_continuous();
+      repeat (40) @(posedge clk);
+    end
+  endtask
+
+  // P6: no extra fifo_rd_en during FINISH (regression for README bug 6)
+  // A sequential burst is followed by a non-sequential request that is held
+  // resident in the FIFO while the burst terminates (FSM in FINISH).  README
+  // bug 6 was an extra fifo_rd_en at burst end that popped and discarded that
+  // trailing request (instruction at 0x648 swallowed).  If that happens the
+  // request is granted but never produces a response, so wait_responses below
+  // times out.
+  task test_finish_no_extra_fifo_rd_en;
+    integer granted;
+    integer waited;
+    reg [31:0] cur;
+    begin
+      start_test("P6: no extra fifo_rd_en in FINISH (trailing request not swallowed)");
+      // Stall the WB side first so all four requests pile up in the FIFO
+      // before any of them is serviced.  This guarantees the non-sequential
+      // 0x648 is resident in the FIFO when the 0x600/0x604/0x608 burst
+      // terminates and the FSM enters FINISH -- exactly the window where the
+      // extra fifo_rd_en of README bug 6 would pop and discard 0x648.
+      stop_ack();
+
+      // Accumulate 0x600/0x604/0x608 then non-sequential 0x648 (4 grants).
+      granted = 0;
+      waited  = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (granted < 4 && waited < 60) begin
+        cur = (granted < 3) ? (32'h0000_0600 + granted * 4) : 32'h0000_0648;
+        req_addr = cur;
+        @(posedge clk);
+        if (gnt) granted = granted + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      if (granted < 4) fail("P6: not all four requests were granted");
+
+      // Release the WB side: the adapter bursts 0x600/0x604/0x608, then hits
+      // the non-sequential 0x648 at the FIFO head and finishes the burst.
+      set_ack_continuous();
+      wait_responses(4, 120);   // times out if 0x648 was swallowed in FINISH
+      expect_counts(4, 4);
+      check(sb_addr[0] == 32'h0000_0600, "P6: first grant 0x600");
+      check(sb_addr[3] == 32'h0000_0648,
+            "P6: trailing non-sequential 0x648 must not be swallowed at burst end");
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
-  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12
+  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 L1 GAP P6
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -700,6 +955,9 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "C10")  test_no_resp_valid_when_fifo_empty();
     if (testcase_filter == "" || testcase_filter == "C11")  test_first_beat_not_cut();
     if (testcase_filter == "" || testcase_filter == "C12")  test_later_beats_cut_correctly();
+    if (testcase_filter == "" || testcase_filter == "L1")   test_fifo_full_latency();
+    if (testcase_filter == "" || testcase_filter == "GAP")  test_fifo_full_with_req_gap();
+    if (testcase_filter == "" || testcase_filter == "P6")   test_finish_no_extra_fifo_rd_en();
 
     if (errors == 0)
       $display("\nPASS: all ibex_wb_host_adapter tests passed");
