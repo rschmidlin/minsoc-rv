@@ -50,7 +50,6 @@ module ibex_wb_host_adapter_tb;
     .rst      (rst),
     .req_valid(req_valid),
     .req_addr (req_addr),
-    .req_len  (4'd1),        // unused by DUT; tied off
     .req_we   (req_we),
     .req_wdata(req_wdata),
     .req_be   (req_be),
@@ -131,7 +130,7 @@ module ibex_wb_host_adapter_tb;
     if (!cond) fail(msg);
   endtask
 
-  always @(posedge clk) begin
+  always @(negedge clk) begin
     if (!rst) begin
       if (gnt) begin
         sb_addr [sb_wr] = req_addr;
@@ -263,8 +262,8 @@ module ibex_wb_host_adapter_tb;
         req_be    = be;
         req_wdata = wdata;
         @(posedge clk);
+        @(negedge clk);
         if (gnt) begin
-          @(negedge clk);
           req_valid = 1'b0;
           disable hold_req_until_gnt;
         end
@@ -315,10 +314,10 @@ module ibex_wb_host_adapter_tb;
         if (gnt) begin
           remaining = remaining - 1;
           cur_addr  = cur_addr + 32'd4;
+          req_addr = cur_addr;
         end
         waited = waited + 1;
       end
-      @(negedge clk);
       req_valid = 1'b0;
       if (remaining > 0) fail("issue_burst_reads: timeout");
     end
@@ -361,9 +360,15 @@ module ibex_wb_host_adapter_tb;
 
   task wait_responses(input integer n, input integer max_cycles);
     integer i;
-    for (i = 0; i < max_cycles; i = i + 1) begin
-      @(posedge clk);
-      if (responses_seen >= n) disable wait_responses;
+    reg responses_nr_reached;
+    responses_nr_reached = 1'b0;
+    for (i = 0; (i < max_cycles && !responses_nr_reached); i = i + 1) begin
+      @(negedge clk);
+      if (responses_seen >= n) responses_nr_reached = 1'b1;
+    end
+    if (responses_nr_reached) begin
+      @(negedge clk)
+      disable wait_responses;
     end
     fail("wait_responses: timeout");
   endtask
@@ -504,9 +509,11 @@ module ibex_wb_host_adapter_tb;
         req_be    = 4'hf;
         req_wdata = 32'h0;
         @(posedge clk);
-        if (gnt) gnt_count = gnt_count + 1;
+        if (gnt) begin
+          gnt_count = gnt_count + 1;
+          req_addr  = 32'h0000_0600 + (gnt_count * 4);
+        end
       end
-      @(negedge clk);
       req_valid = 1'b0;
 
       // FIFO must be full: gnt stays deasserted for several more cycles.

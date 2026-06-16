@@ -23,12 +23,11 @@ module ibex_wb_host_adapter #(
     // Request
     input wire        req_valid,
     input wire [31:0] req_addr,
-    input wire [ 3:0] req_len,    // up to 16 beats
     input wire        req_we,
     input wire [31:0] req_wdata,
     input wire [ 3:0] req_be,
 
-    output reg gnt,              // Combinatorial grant: high while collecting sequential requests
+    output wire gnt,              // Combinatorial grant: high while collecting sequential requests
 
     // Response
     output reg        resp_valid,
@@ -47,35 +46,55 @@ module ibex_wb_host_adapter #(
     output reg [ 1:0] wb_bte
 );
 
-wire last_beat;
-reg fifo_wr_en;
+wire fifo_wr_en;
 reg fifo_rd_en;
 wire fifo_full, fifo_empty;
-wire fifo_last_beat;
 wire fifo_req_we;
 wire [3:0] fifo_req_be;
 wire [31:0] fifo_req_wdata;
 wire [31:0] fifo_req_addr;
 
+reg [31:0] req_addr_q;
+reg req_we_q;
+reg [3:0] req_be_q;
+reg [31:0] req_wdata_q;
+reg req_valid_q;
+
+
 // Store req_addr & req_be 
 fifo_fwft #(
     .DEPTH_WIDTH(MAX_FIFO_DEPTH),
-    .DATA_WIDTH(70)
+    .DATA_WIDTH(69)
   ) fifo_i(
     .clk(clk),
     .rst(rst),
-    .din({last_beat, req_we, req_be, req_wdata, req_addr}),
+    .din({req_we_q, req_be_q, req_wdata_q, req_addr_q}),
     .wr_en(fifo_wr_en),
-    .dout({fifo_last_beat, fifo_req_we, fifo_req_be, fifo_req_wdata, fifo_req_addr}),
+    .dout({fifo_req_we, fifo_req_be, fifo_req_wdata, fifo_req_addr}),
     .rd_en(fifo_rd_en),
     .full(fifo_full),
     .empty(fifo_empty)
 );
 
-reg [31:0] req_addr_q;
-reg req_we_q;
-reg [3:0] req_be_q;
-reg [31:0] reg_wdata_q;
+always @(posedge clk) begin
+  if (rst) begin
+    req_we_q <= 1'b0;
+    req_be_q <= 4'h0;
+    req_wdata_q <= 32'h0000_0000;
+    req_addr_q <= 32'h0000_0000;
+    req_valid_q <= 1'b0;
+  end
+  else begin
+    req_we_q <= req_we;
+    req_be_q <= req_be;
+    req_wdata_q <= req_wdata;
+    req_addr_q <= req_addr;
+    req_valid_q <= req_valid;
+  end
+end
+
+assign fifo_wr_en = req_valid_q & ~fifo_full;
+assign gnt = fifo_wr_en;
 
 wire [31:0] next_address;
 wire valid_req_address;
@@ -90,7 +109,7 @@ localparam STALL = 2'b10;
 
 reg [1:0] ib_state;
 reg [1:0] wb_state;
-
+/*
 // Assert GNT with 2 cycles delay of request if not forbidden by transaction FSM
 always @(posedge clk) begin
   if (rst) begin
@@ -138,7 +157,7 @@ always @(posedge clk) begin
     endcase
   end
 end
-
+*/
 localparam PREPARE = 2'b01;
 localparam ACTIVE = 2'b10;
 localparam FINISH = 2'b11;
@@ -163,6 +182,7 @@ always @(posedge clk) begin
     wb_bte <= 2'b00;
     wb_state <= IDLE;
     fifo_rd_en <= 1'b0;
+    resp_valid <= 1'b0;
   end
   else begin
     wb_adr_q <= wb_adr;
@@ -203,7 +223,7 @@ always @(posedge clk) begin
         wb_adr <= fifo_req_addr_q;
         wb_dat_w <= fifo_req_wdata_q;
         wb_sel <= fifo_req_be_q;
-        if (!fifo_last_beat && !fifo_req_we_q) begin
+        if (!fifo_req_we_q) begin
           wb_cti <= 3'b010;
           wb_bte <= 2'b00;
         end
@@ -220,19 +240,19 @@ always @(posedge clk) begin
           // If address of next beat is not sequential
           // ignoring first ack that will have initial address,
           // then interrupt burst after this beat
-          if (fifo_empty || (!fifo_rd_en && (fifo_req_addr != (wb_adr + 'd4)))) begin
+          if (fifo_empty || (/* if not read, comparison can be old */!fifo_rd_en && (fifo_req_addr != (wb_adr + 'd4)))) begin
             // Last accepted/granted beat has just completed.
             wb_cyc   <= 1'b1;
             wb_stb   <= 1'b0;
             wb_cti   <= 3'b111;
-            resp_valid <= !fifo_rd_en;  // avoid resp_valid if burst was interrupted
+            resp_valid <= !fifo_rd_en && (fifo_req_addr != (wb_adr + 'd4));  // avoid resp_valid if burst was interrupted
             wb_state <= FINISH;
           end else begin
             fifo_rd_en <= 1'b1;
             // More already-granted beats remain.
             wb_adr <= wb_adr + 'd4;
 
-            if (fifo_last_beat) begin
+            if (1'b0 /*fifo_last_beat*/) begin
               wb_cti <= 3'b111;   // next accepted beat is the last one
               resp_valid <= 1'b1;
               wb_state <= FINISH;

@@ -293,7 +293,6 @@ module ibex_wb
   assign instr_req_addr  = instr_addr;
   assign instr_req_we    = 1'b0;  // Instructions are always reads
   assign instr_req_wdata = 32'b0;
-  assign instr_req_len   = ICache ? 4'h2 : 4'h1;
 
   /*
 	 * Data Memory Interface to Request/Response Adapter
@@ -309,7 +308,6 @@ module ibex_wb
   assign data_req_addr   = data_addr;
   assign data_req_we     = data_we;
   assign data_req_wdata  = data_wdata;
-  assign data_req_len    = 4'h1;  // Single beat
 
   /*
 	 * Instruction Wishbone Backend Adapter Instance
@@ -319,7 +317,6 @@ module ibex_wb
       .rst(~rst_ni),
       .req_valid(instr_req_valid),
       .req_addr(instr_req_addr),
-      .req_len(instr_req_len),
       .req_we(instr_req_we),
       .req_wdata(instr_req_wdata),
       .req_be(4'hF),
@@ -346,7 +343,6 @@ module ibex_wb
       .rst(~rst_ni),
       .req_valid(data_req_valid),
       .req_addr(data_req_addr),
-      .req_len(data_req_len),
       .req_we(data_req_we),
       .req_wdata(data_req_wdata),
       .req_be(data_be),

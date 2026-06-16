@@ -188,8 +188,6 @@ module minsoc_riscv_dbg #(
 
   assign master_rerror = master_wb_err_i;
 
-  assign master_req_len = 4'h1;  // Single beat
-
   /*
  * Host Wishbone backend adapter
  */
@@ -199,7 +197,6 @@ module minsoc_riscv_dbg #(
 
       .req_valid(master_req_valid),
       .req_addr(master_req_addr),
-      .req_len(master_req_len),
       .req_we(master_req_we),
       .req_wdata(master_req_wdata),
       .req_be(master_be),

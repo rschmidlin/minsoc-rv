@@ -1,0 +1,54 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Tue Jun 16 09:31:11 2026
+[*]
+[dumpfile] "/home/raul/workspace/build/ibex_wb_adapter_0.1/sim/testlog.vcd"
+[dumpfile_mtime] "Tue Jun 16 09:29:13 2026"
+[dumpfile_size] 10400
+[savefile] "/home/raul/workspace/minsoc-rv/data/ibex_wb_adapter.gtkw"
+[timestart] 0
+[size] 1920 985
+[pos] -1 -1
+*-15.141920 79300 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] ibex_wb_host_adapter_tb.
+[treeopen] ibex_wb_host_adapter_tb.dut.
+[sst_width] 297
+[signals_width] 276
+[sst_expanded] 1
+[sst_vpaned_height] 291
+@28
+ibex_wb_host_adapter_tb.dut.rst
+ibex_wb_host_adapter_tb.dut.clk
+ibex_wb_host_adapter_tb.dut.fifo_full
+ibex_wb_host_adapter_tb.dut.req_valid
+ibex_wb_host_adapter_tb.dut.fifo_wr_en
+ibex_wb_host_adapter_tb.dut.gnt
+@22
+ibex_wb_host_adapter_tb.dut.req_addr[31:0]
+@28
+ibex_wb_host_adapter_tb.dut.fifo_i.rd_en
+@22
+ibex_wb_host_adapter_tb.dut.resp_rdata[31:0]
+@28
+ibex_wb_host_adapter_tb.dut.resp_valid
+ibex_wb_host_adapter_tb.dut.wb_ack
+@22
+ibex_wb_host_adapter_tb.dut.wb_dat_r[31:0]
+ibex_wb_host_adapter_tb.dut.wb_adr[31:0]
+@28
+ibex_wb_host_adapter_tb.dut.wb_cti[2:0]
+ibex_wb_host_adapter_tb.dut.wb_cyc
+ibex_wb_host_adapter_tb.dut.wb_stb
+ibex_wb_host_adapter_tb.dut.wb_state[1:0]
+ibex_wb_host_adapter_tb.dut.fifo_rd_en
+ibex_wb_host_adapter_tb.dut.fifo_empty
+@22
+ibex_wb_host_adapter_tb.dut.fifo_req_addr[31:0]
+ibex_wb_host_adapter_tb.dut.fifo_req_addr_q[31:0]
+@420
+ibex_wb_host_adapter_tb.sb_rd
+ibex_wb_host_adapter_tb.sb_wr
+ibex_wb_host_adapter_tb.grants_seen
+ibex_wb_host_adapter_tb.responses_seen
+[pattern_trace] 1
+[pattern_trace] 0
