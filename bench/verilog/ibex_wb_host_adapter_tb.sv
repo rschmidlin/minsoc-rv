@@ -303,6 +303,9 @@ module ibex_wb_host_adapter_tb;
       remaining = count;
       waited    = 0;
       cur_addr  = base_addr;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_addr  = cur_addr;
       while (remaining > 0 && waited < max_cycles) begin
         @(negedge clk);
         req_valid = 1'b1;
