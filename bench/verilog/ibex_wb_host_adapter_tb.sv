@@ -130,7 +130,7 @@ module ibex_wb_host_adapter_tb;
     if (!cond) fail(msg);
   endtask
 
-  always @(negedge clk) begin
+  always @(posedge clk) begin
     if (!rst) begin
       if (gnt) begin
         sb_addr [sb_wr] = req_addr;
@@ -300,14 +300,14 @@ module ibex_wb_host_adapter_tb;
     integer   waited;
     reg [31:0] cur_addr;
     begin
-      remaining = count;
+      remaining = count - 1;
       waited    = 0;
       cur_addr  = base_addr;
       @(negedge clk);
       req_valid = 1'b1;
       req_addr  = cur_addr;
+      @(negedge clk);
       while (remaining > 0 && waited < max_cycles) begin
-        @(negedge clk);
         req_valid = 1'b1;
         req_addr  = cur_addr;
         req_we    = 1'b0;
@@ -320,6 +320,7 @@ module ibex_wb_host_adapter_tb;
           req_addr = cur_addr;
         end
         waited = waited + 1;
+        @(negedge clk);
       end
       req_valid = 1'b0;
       if (remaining > 0) fail("issue_burst_reads: timeout");
@@ -504,18 +505,21 @@ module ibex_wb_host_adapter_tb;
       // observes a properly sequential next address and never stalls due to
       // an address gap.  Run for 20 cycles — enough for a depth-4 FIFO to
       // saturate (5 grants × 2 cycles/grant = 10 cycles, plus margin).
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_addr  = 32'h0000_0600 + (gnt_count * 4);
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      @(negedge clk);
       for (i = 0; i < 20; i = i + 1) begin
-        @(negedge clk);
-        req_valid = 1'b1;
         req_addr  = 32'h0000_0600 + (gnt_count * 4);
-        req_we    = 1'b0;
-        req_be    = 4'hf;
-        req_wdata = 32'h0;
         @(posedge clk);
         if (gnt) begin
           gnt_count = gnt_count + 1;
           req_addr  = 32'h0000_0600 + (gnt_count * 4);
         end
+        @(negedge clk);
       end
       req_valid = 1'b0;
 

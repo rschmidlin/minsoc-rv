@@ -68,7 +68,7 @@ fifo_fwft #(
   ) fifo_i(
     .clk(clk),
     .rst(rst),
-    .din({req_we_q, req_be_q, req_wdata_q, req_addr_q}),
+    .din({req_we, req_be, req_wdata, req_addr}),
     .wr_en(fifo_wr_en),
     .dout({fifo_req_we, fifo_req_be, fifo_req_wdata, fifo_req_addr}),
     .rd_en(fifo_rd_en),
@@ -85,16 +85,18 @@ always @(posedge clk) begin
     req_valid_q <= 1'b0;
   end
   else begin
-    req_we_q <= req_we;
-    req_be_q <= req_be;
-    req_wdata_q <= req_wdata;
-    req_addr_q <= req_addr;
-    req_valid_q <= req_valid;
+    if (fifo_wr_en) begin
+      req_we_q <= req_we;
+      req_be_q <= req_be;
+      req_wdata_q <= req_wdata;
+      req_addr_q <= req_addr;
+      req_valid_q <= req_valid;
+    end
   end
 end
 
-assign fifo_wr_en = req_valid_q & ~fifo_full;
-assign gnt = fifo_wr_en;
+assign fifo_wr_en = req_valid & ~fifo_full;
+assign gnt = fifo_wr_en/* & req_valid*/;
 
 
 // Recognize fifo_empty one read cycle ahead
@@ -242,7 +244,8 @@ always @(posedge clk) begin
           wb_dat_w <= fifo_req_wdata_qq;
           resp_valid <= 1'b1;
 
-          if (/*fifo_empty || */!burst_valid) begin
+          if (fifo_empty || !burst_valid) begin
+            //fifo_rd_wb_ctrl <= 1'b1;
             wb_cti <= 3'b111;
             wb_state <= FINISH;
           end
