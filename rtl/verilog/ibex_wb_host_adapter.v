@@ -245,7 +245,7 @@ always @(posedge clk) begin
           resp_valid <= 1'b1;
 
           if (fifo_empty || !burst_valid) begin
-            //fifo_rd_wb_ctrl <= 1'b1;
+            fifo_rd_wb_ctrl <= 1'b1;
             wb_cti <= 3'b111;
             wb_state <= FINISH;
           end
@@ -281,7 +281,7 @@ always @(posedge clk) begin
           wb_dat_w <= fifo_req_wdata_q;
           wb_adr <= 32'h0000_0000;
 
-          fifo_wb_rd <= 1'b1;
+          //fifo_wb_rd <= 1'b1;
 
           wb_cyc <= 1'b0;
           wb_stb <= 1'b0;
