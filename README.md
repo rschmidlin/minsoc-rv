@@ -59,6 +59,18 @@ Encountered problems:
   - 4) around 750 ps, on jump from 0x158 to 0x84, lost 0x84 request
     Solution: cancel request immediately on non-continuous access
 
+  - 5) after conversion to FIFO interface on Ibex - two different scenarios when burst needs to be stopped:
+        - a) next address was not granted but fifo_req_addr is not valid because last fifo_rd_en is way back - C6
+              results in burst being scattered - performance is bad
+        - b) fifo_rd_en is asserted and address is invalid - C7 & C8
+
+    Solution: address has to be evaluated, period. After first acknowledgement, we need to at least negate resp_valid if address check was not possible. 
+
+  - 6) Instruction of address 0x648 was swallowed at 3184 ps with commit 0e93ccca5c159753b8fe737307575d4e8d602efa because of too many fifo_rd_en, one too much at end of burst
+    Solution: avoid fifo_rd_en during FINISH. Question is whether this is always valid. 
+
+  - 7) Testbench is not working properly because of combinatorial FIFO read: FIFO ends up reading more than expected. 
+
 Missing points:
   - 1) [X] Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
   - 2) [X] double-check fifo size because it is never full
