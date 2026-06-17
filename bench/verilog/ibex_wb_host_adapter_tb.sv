@@ -13,6 +13,9 @@ module ibex_wb_host_adapter_tb;
 
   vlog_tb_utils vlog_tb_utils0 ();
 
+  // CLASSICQ state encoding from ibex_wb_host_adapter.v (localparam = 4'b0101).
+  localparam [3:0] DUT_CLASSICQ = 4'b0101;
+
   // ---------------------------------------------------------------------------
   // Clock and reset
   // ---------------------------------------------------------------------------
@@ -90,6 +93,14 @@ module ibex_wb_host_adapter_tb;
   integer    test_no;
   reg [1023:0] testcase_filter;
 
+  // Per-beat Wishbone metadata check (C14/C15) and classic-FIFO invariant
+  // (C13).  Both are scoped to the scenarios that need them so the existing
+  // C1-C12 behaviour is untouched; reset_dut clears them.
+  integer    beat_idx;            // index of granted request the next WB beat serves
+  reg        check_beats;         // gate per-beat wb_we/wb_sel/wb_dat_w check
+  reg        check_classic_fifo;  // gate "no FIFO pop during CLASSICQ" check
+  reg        classic_armed;       // set when the C13 corner has been armed
+
   // Capture WB write-side signals for write-request checks.
   reg [31:0] cap_wb_dat_w;
   reg [3:0]  cap_wb_sel;
@@ -121,6 +132,16 @@ module ibex_wb_host_adapter_tb;
     end
   end
 
+  // C13: while the WB FSM is in CLASSICQ it is servicing a single, non-burst
+  // transfer.  Popping the FIFO there (fifo_rd_en) means a stray, never-part-
+  // of-this-cycle request was consumed by the classic ACK — the bug this case
+  // exists to catch.  Scoped via check_classic_fifo so other tests are unaffected.
+  always @(posedge clk) begin
+    if (!rst && check_classic_fifo &&
+        dut.wb_state == DUT_CLASSICQ && dut.fifo_rd_en)
+      fail("FIFO read during classic WB transaction (stray FIFO pop on classic ACK)");
+  end
+
   task fail(input [1023:0] msg);
     errors = errors + 1;
     $display("FAIL t=%0t: %0s", $time, msg);
@@ -139,6 +160,34 @@ module ibex_wb_host_adapter_tb;
         sb_wdata[sb_wr] = req_wdata;
         sb_wr           = sb_wr + 1;
         grants_seen     = grants_seen + 1;
+      end
+
+      // C14/C15: per-beat Wishbone control check.  One effective beat is one
+      // STB+ACK; beats are serviced in grant order, so beat_idx walks the
+      // scoreboard in lock-step with the WB bus.  A write->read or byte-enable
+      // change wrongly folded into a running burst surfaces here as a stale
+      // wb_we / wb_sel / wb_dat_w that no longer matches the granted request.
+      if (check_beats && wb_cyc && wb_stb && wb_ack) begin
+        if (beat_idx >= sb_wr) begin
+          fail("WB beat acknowledged with no corresponding granted request");
+        end else begin
+          if (wb_we !== sb_we[beat_idx]) begin
+            $display("  beat %0d addr %08x: wb_we=%b expected we=%b",
+                     beat_idx, sb_addr[beat_idx], wb_we, sb_we[beat_idx]);
+            fail("burst not stopped: wb_we for beat differs from granted request (write/read change)");
+          end
+          if (sb_we[beat_idx] && (wb_sel !== sb_be[beat_idx])) begin
+            $display("  beat %0d addr %08x: wb_sel=%b expected be=%b",
+                     beat_idx, sb_addr[beat_idx], wb_sel, sb_be[beat_idx]);
+            fail("burst not stopped: wb_sel for beat differs from granted request (byte-enable change)");
+          end
+          if (sb_we[beat_idx] && (wb_dat_w !== sb_wdata[beat_idx])) begin
+            $display("  beat %0d addr %08x: wb_dat_w=%08x expected wdata=%08x",
+                     beat_idx, sb_addr[beat_idx], wb_dat_w, sb_wdata[beat_idx]);
+            fail("write data for beat differs from granted request");
+          end
+        end
+        beat_idx = beat_idx + 1;
       end
 
       if (resp_valid) begin
@@ -335,6 +384,39 @@ module ibex_wb_host_adapter_tb;
     repeat (cycles) @(posedge clk);
   endtask
 
+  // Issue a back-to-back request stream from the prog_* arrays, holding
+  // req_valid continuously and advancing to the next entry on each grant.
+  // Continuous, every-other-cycle grants let the FIFO accumulate sequential
+  // entries fast enough for the WB FSM to open a real burst — the situation in
+  // which a mid-stream we/be change must stop the burst (C14/C15).
+  reg [31:0] prog_addr  [0:15];
+  reg        prog_we    [0:15];
+  reg [3:0]  prog_be    [0:15];
+  reg [31:0] prog_wdata [0:15];
+
+  task drive_program(input integer n, input integer max_cycles);
+    integer idx;
+    integer waited;
+    begin
+      idx    = 0;
+      waited = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      while (idx < n && waited < max_cycles) begin
+        req_addr  = prog_addr[idx];
+        req_we    = prog_we[idx];
+        req_be    = prog_be[idx];
+        req_wdata = prog_wdata[idx];
+        @(posedge clk);
+        if (gnt) idx = idx + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      if (idx < n) fail("drive_program: timeout granting requests");
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Test infrastructure
   // ---------------------------------------------------------------------------
@@ -350,6 +432,9 @@ module ibex_wb_host_adapter_tb;
     ack_countdown = 0;
     sb_wr         = 0;
     sb_rd         = 0;
+    beat_idx      = 0;
+    check_beats   = 1'b0;
+    check_classic_fifo = 1'b0;
     grants_seen   = 0;
     responses_seen = 0;
     rst = 1'b1;
@@ -371,6 +456,36 @@ module ibex_wb_host_adapter_tb;
       if (responses_seen >= n) disable wait_responses;
     end
     fail("wait_responses: timeout");
+  endtask
+
+  // Wait until the DUT enters the CLASSICQ state (single classic transfer).
+  task wait_classicq(input integer max_cycles);
+    integer i;
+    for (i = 0; i < max_cycles; i = i + 1) begin
+      @(posedge clk);
+      if (dut.wb_state == DUT_CLASSICQ) disable wait_classicq;
+    end
+    fail("wait_classicq: classic transfer never started");
+  endtask
+
+  // Wait (with ACK still withheld) until the parked second request is visible
+  // at the FIFO head while the DUT is stalled in CLASSICQ, so burst_valid is
+  // high.  This is what arms the C13 invariant: the FWFT FIFO has a few cycles
+  // of write-to-readable latency, so a just-granted sequential entry is not
+  // visible the moment it is granted.  CLASSICQ only exits on wb_ack, so with
+  // ACK off the DUT cannot leave the state while we wait.
+  task wait_classic_armed(input integer max_cycles);
+    integer i;
+    begin
+      classic_armed = 1'b0;
+      for (i = 0; i < max_cycles; i = i + 1) begin
+        @(posedge clk);
+        if (dut.wb_state == DUT_CLASSICQ && !dut.fifo_empty && dut.burst_valid) begin
+          classic_armed = 1'b1;
+          disable wait_classic_armed;
+        end
+      end
+    end
   endtask
 
   task expect_counts(input integer g, input integer r);
@@ -673,11 +788,123 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+  // C13 (testbench 1): two CLASSIC transfers with incremental addresses.
+  //
+  // Two incremental-address reads (A, A+4) are forced down the CLASSIC path and
+  // the second must be "received later" — only after the first classic transfer
+  // completes — with the FIFO never popped during the classic cycle.
+  //
+  //   1. ACK is withheld and only A is requested, so the adapter drains the one
+  //      FIFO entry and lands in CLASSICQ (FIFO empty at PREPARE1 => no burst).
+  //      The classic transfer then stalls there awaiting ACK.
+  //   2. While stalled in CLASSICQ the second, address-sequential read A+4 is
+  //      granted and parked in the FIFO (burst_valid is now high).
+  //   3. ACK is released.  The classic ACK for A must complete WITHOUT popping
+  //      A+4; A+4 is then picked up as its own transfer and responds second.
+  //
+  // The white-box invariant (check_classic_fifo) catches the stray FIFO pop:
+  // in CLASSICQ the adapter sets fifo_rd_wb_ctrl=0, so fifo_rd_en = wb_ack &
+  // burst_valid; with A+4 parked, burst_valid is high and the classic ACK would
+  // wrongly pop it.
+  task test_classic_incremental_received_later;
+    begin
+      start_test("C13: two classic incremental transfers - 2nd received later, no FIFO pop in classic");
+      check_classic_fifo = 1'b1;
+
+      // Stall the first classic transfer so the second request can be parked
+      // in the FIFO while CLASSICQ is active.
+      stop_ack();
+      issue_read(32'h0000_0200);
+      wait_classicq(40);
+
+      check(dut.wb_state == DUT_CLASSICQ, "expected to still be in classic transfer");
+      issue_read(32'h0000_0204);
+      check(responses_seen == 0,
+            "no response may appear before the stalled classic transfer is ACKed");
+
+      // Arm the corner: wait for 0x204 to be visible at the FIFO head (so
+      // burst_valid is high) while still stalled in CLASSICQ.  Without this
+      // the FWFT latency lets the classic transfer finish before 0x204 is
+      // visible, and the invariant would never be exercised.
+      wait_classic_armed(40);
+      check(classic_armed, "could not arm classic-FIFO corner (0x204 not visible during CLASSICQ)");
+      check(dut.wb_state == DUT_CLASSICQ, "must still be in classic transfer once armed");
+
+      set_ack_continuous();
+      wait_responses(2, 60);
+      expect_counts(2, 2);
+
+      check(sb_addr[0] == 32'h0000_0200, "first transfer must be 0x200");
+      check(sb_addr[1] == 32'h0000_0204, "second transfer must be 0x204, serviced after the first");
+
+      repeat (4) @(posedge clk);
+      check(!wb_cyc, "WB must be idle after both classic transfers complete");
+      check(responses_seen == 2, "no phantom response after both transfers complete");
+    end
+  endtask
+
+  // C14 (testbench 2, part 1): write->read change mid-burst must stop the burst.
+  //
+  // Sequential addresses A, A+4, A+8, but A and A+4 are writes while A+8 is a
+  // read.  burst_valid compares addresses only, so it stays high into A+8; a
+  // burst that ignores req_we would issue the read beat with stale wb_we=1.
+  // The per-beat check requires wb_we/wb_dat_w to match each granted request,
+  // so the burst must stop and A+8 must be issued as a fresh read (wb_we=0).
+  task test_burst_write_to_read_stops;
+    begin
+      start_test("C14: burst with write->read change must stop before the read beat");
+      check_beats = 1'b1;
+      set_ack_continuous();
+
+      prog_addr[0] = 32'h0000_0400; prog_we[0] = 1'b1; prog_be[0] = 4'hf; prog_wdata[0] = 32'h1111_1111;
+      prog_addr[1] = 32'h0000_0404; prog_we[1] = 1'b1; prog_be[1] = 4'hf; prog_wdata[1] = 32'h2222_2222;
+      prog_addr[2] = 32'h0000_0408; prog_we[2] = 1'b0; prog_be[2] = 4'hf; prog_wdata[2] = 32'h0;
+
+      fork
+        begin drive_program(3, 40); end
+        begin wait_responses(3, 120); end
+      join
+
+      expect_counts(3, 3);
+      check(beat_idx == 3, "every granted request must produce exactly one WB beat");
+      repeat (4) @(posedge clk);
+      check(!wb_cyc, "WB must be idle after the program completes");
+    end
+  endtask
+
+  // C15 (testbench 2, part 2): byte-enable change mid-burst must stop the burst.
+  //
+  // Three sequential writes B, B+4, B+8 with byte enables f, 3, f.  A burst
+  // latches wb_sel once (to the first beat's f) and never updates it, so the
+  // B+4 beat would carry the wrong wb_sel.  The per-beat check requires wb_sel
+  // to match each granted write's req_be, so the burst must stop on the change.
+  task test_burst_byte_enable_change_stops;
+    begin
+      start_test("C15: burst with varying byte enable must stop before the differing beat");
+      check_beats = 1'b1;
+      set_ack_continuous();
+
+      prog_addr[0] = 32'h0000_0500; prog_we[0] = 1'b1; prog_be[0] = 4'hf; prog_wdata[0] = 32'haaaa_aaaa;
+      prog_addr[1] = 32'h0000_0504; prog_we[1] = 1'b1; prog_be[1] = 4'h3; prog_wdata[1] = 32'hbbbb_bbbb;
+      prog_addr[2] = 32'h0000_0508; prog_we[2] = 1'b1; prog_be[2] = 4'hf; prog_wdata[2] = 32'hcccc_cccc;
+
+      fork
+        begin drive_program(3, 40); end
+        begin wait_responses(3, 120); end
+      join
+
+      expect_counts(3, 3);
+      check(beat_idx == 3, "every granted request must produce exactly one WB beat");
+      repeat (4) @(posedge clk);
+      check(!wb_cyc, "WB must be idle after the program completes");
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
-  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12
+  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -700,6 +927,9 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "C10")  test_no_resp_valid_when_fifo_empty();
     if (testcase_filter == "" || testcase_filter == "C11")  test_first_beat_not_cut();
     if (testcase_filter == "" || testcase_filter == "C12")  test_later_beats_cut_correctly();
+    if (testcase_filter == "" || testcase_filter == "C13")  test_classic_incremental_received_later();
+    if (testcase_filter == "" || testcase_filter == "C14")  test_burst_write_to_read_stops();
+    if (testcase_filter == "" || testcase_filter == "C15")  test_burst_byte_enable_change_stops();
 
     if (errors == 0)
       $display("\nPASS: all ibex_wb_host_adapter tests passed");
