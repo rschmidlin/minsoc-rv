@@ -900,11 +900,51 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+  // C16 (burst write, continuous ACK): clean sequential burst of writes.
+  //
+  // Positive complement to C3/C4 (which burst reads) and to C14/C15 (which
+  // require a burst to STOP on a write->read or byte-enable change).  Here all
+  // four requests are writes to sequential addresses A, A+4, A+8, A+12 with the
+  // same byte enable and distinct write data, acknowledged continuously.  The
+  // addresses are sequential and we/be are consistent, so burst_valid,
+  // burst_rw_consistent and burst_be_consistent all stay high and the adapter
+  // should open and run a single Wishbone burst to completion.
+  //
+  // check_beats makes the scoreboard verify, for every acknowledged beat, that
+  //   - wb_we matches the granted request (must stay 1 across the burst),
+  //   - wb_sel matches the granted byte enable, and
+  //   - wb_dat_w matches the granted write data for THAT beat.
+  // The last point is the crux: a burst that latches the first beat's write
+  // data and never advances it (or advances it out of step) drives stale
+  // wb_dat_w on later beats, which surfaces here as a per-beat data mismatch.
+  task test_burst_write_continuous_ack;
+    begin
+      start_test("C16: sequential burst write, continuous ACK");
+      check_beats = 1'b1;
+      set_ack_continuous();
+
+      prog_addr[0] = 32'h0000_0700; prog_we[0] = 1'b1; prog_be[0] = 4'hf; prog_wdata[0] = 32'h1111_0000;
+      prog_addr[1] = 32'h0000_0704; prog_we[1] = 1'b1; prog_be[1] = 4'hf; prog_wdata[1] = 32'h2222_0001;
+      prog_addr[2] = 32'h0000_0708; prog_we[2] = 1'b1; prog_be[2] = 4'hf; prog_wdata[2] = 32'h3333_0002;
+      prog_addr[3] = 32'h0000_070c; prog_we[3] = 1'b1; prog_be[3] = 4'hf; prog_wdata[3] = 32'h4444_0003;
+
+      fork
+        begin drive_program(4, 60); end
+        begin wait_responses(4, 160); end
+      join
+
+      expect_counts(4, 4);
+      check(beat_idx == 4, "every granted write must produce exactly one WB beat");
+      repeat (4) @(posedge clk);
+      check(!wb_cyc, "WB must be idle after the burst write completes");
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
-  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15
+  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15 C16
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -930,6 +970,7 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "C13")  test_classic_incremental_received_later();
     if (testcase_filter == "" || testcase_filter == "C14")  test_burst_write_to_read_stops();
     if (testcase_filter == "" || testcase_filter == "C15")  test_burst_byte_enable_change_stops();
+    if (testcase_filter == "" || testcase_filter == "C16")  test_burst_write_continuous_ack();
 
     if (errors == 0)
       $display("\nPASS: all ibex_wb_host_adapter tests passed");

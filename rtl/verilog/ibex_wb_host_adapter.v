@@ -130,8 +130,16 @@ always @(posedge clk) begin
   end
 end
 
+wire burst_rw_consistent;
+wire burst_be_consistent;
+wire burst_addr_valid;
 wire burst_valid;
-assign burst_valid = (fifo_req_addr == (fifo_req_addr_q + 'd4));
+
+assign burst_rw_consistent = (fifo_req_we == fifo_req_we_q);
+assign burst_be_consistent = (fifo_req_be == fifo_req_be_q);
+assign burst_addr_valid = (fifo_req_addr == (fifo_req_addr_q + 'd4));
+assign burst_valid = (burst_addr_valid & burst_be_consistent & burst_rw_consistent);
+
 
 reg fifo_rd_wb_ctrl;
 reg fifo_wb_rd;
@@ -241,7 +249,7 @@ always @(posedge clk) begin
           fifo_rd_en_direct <= 1'b1;
           wb_adr <= wb_adr + 'd4;
           resp_rdata <= wb_dat_r;
-          wb_dat_w <= fifo_req_wdata_qq;
+          wb_dat_w <= fifo_req_wdata_q;
           resp_valid <= 1'b1;
 
           if (fifo_empty || !burst_valid) begin
@@ -253,7 +261,6 @@ always @(posedge clk) begin
       end
       CLASSICQ: begin
         fifo_rd_en_direct <= 1'b0;
-        fifo_rd_wb_ctrl <= 1'b0;
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
         wb_we <= fifo_req_we_q;
