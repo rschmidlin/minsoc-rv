@@ -93,13 +93,12 @@ module ibex_wb_host_adapter_tb;
   integer    test_no;
   reg [1023:0] testcase_filter;
 
-  // Per-beat Wishbone metadata check (C14/C15) and classic-FIFO invariant
-  // (C13).  Both are scoped to the scenarios that need them so the existing
-  // C1-C12 behaviour is untouched; reset_dut clears them.
+  // Per-beat Wishbone metadata check (C14/C15) and classic preload-pop
+  // invariant (C13).  Both are scoped to the scenarios that need them so the
+  // existing C1-C12 behaviour is untouched; reset_dut clears them.
   integer    beat_idx;            // index of granted request the next WB beat serves
   reg        check_beats;         // gate per-beat wb_we/wb_sel/wb_dat_w check
-  reg        check_classic_fifo;  // gate "no FIFO pop during CLASSICQ" check
-  reg        classic_armed;       // set when the C13 corner has been armed
+  reg        check_classic_pop;   // gate "no preload-buffer pop on classic ACK" check
 
   // Capture WB write-side signals for write-request checks.
   reg [31:0] cap_wb_dat_w;
@@ -132,14 +131,18 @@ module ibex_wb_host_adapter_tb;
     end
   end
 
-  // C13: while the WB FSM is in CLASSICQ it is servicing a single, non-burst
-  // transfer.  Popping the FIFO there (fifo_rd_en) means a stray, never-part-
-  // of-this-cycle request was consumed by the classic ACK — the bug this case
-  // exists to catch.  Scoped via check_classic_fifo so other tests are unaffected.
+  // C13: while the WB FSM is in CLASSICQ it services a single, non-burst
+  // transfer.  In the preload-buffer architecture the transfer's own request
+  // was already popped from the buffer back in PREPARE1, so a *parked*
+  // sequential next request now sits in slot0.  The classic ACK must therefore
+  // NOT pop the preload buffer (preload_buffer_pop) — doing so would swallow
+  // that parked request.  (Note this is distinct from fifo_rd_en, the preload
+  // buffer's own FIFO-read enable, which legitimately runs during CLASSICQ to
+  // keep the slot pipeline filled.)  Scoped via check_classic_pop.
   always @(posedge clk) begin
-    if (!rst && check_classic_fifo &&
-        dut.wb_state == DUT_CLASSICQ && dut.fifo_rd_en)
-      fail("FIFO read during classic WB transaction (stray FIFO pop on classic ACK)");
+    if (!rst && check_classic_pop &&
+        dut.wb_state == DUT_CLASSICQ && wb_ack && dut.preload_buffer_pop)
+      fail("preload buffer popped on classic ACK (parked sequential request swallowed)");
   end
 
   // L1: fifo_fwft full-flag set-latency monitor.
@@ -457,7 +460,7 @@ module ibex_wb_host_adapter_tb;
     sb_rd         = 0;
     beat_idx      = 0;
     check_beats   = 1'b0;
-    check_classic_fifo = 1'b0;
+    check_classic_pop = 1'b0;
     grants_seen   = 0;
     responses_seen = 0;
     rst = 1'b1;
@@ -489,26 +492,6 @@ module ibex_wb_host_adapter_tb;
       if (dut.wb_state == DUT_CLASSICQ) disable wait_classicq;
     end
     fail("wait_classicq: classic transfer never started");
-  endtask
-
-  // Wait (with ACK still withheld) until the parked second request is visible
-  // at the FIFO head while the DUT is stalled in CLASSICQ, so burst_valid is
-  // high.  This is what arms the C13 invariant: the FWFT FIFO has a few cycles
-  // of write-to-readable latency, so a just-granted sequential entry is not
-  // visible the moment it is granted.  CLASSICQ only exits on wb_ack, so with
-  // ACK off the DUT cannot leave the state while we wait.
-  task wait_classic_armed(input integer max_cycles);
-    integer i;
-    begin
-      classic_armed = 1'b0;
-      for (i = 0; i < max_cycles; i = i + 1) begin
-        @(posedge clk);
-        if (dut.wb_state == DUT_CLASSICQ && !dut.fifo_empty && dut.burst_valid) begin
-          classic_armed = 1'b1;
-          disable wait_classic_armed;
-        end
-      end
-    end
   endtask
 
   task expect_counts(input integer g, input integer r);
@@ -811,48 +794,49 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
-  // C13 (testbench 1): two CLASSIC transfers with incremental addresses.
+  // C13: two CLASSIC transfers with incremental addresses, 2nd received later.
   //
   // Two incremental-address reads (A, A+4) are forced down the CLASSIC path and
   // the second must be "received later" — only after the first classic transfer
-  // completes — with the FIFO never popped during the classic cycle.
+  // completes — without being swallowed.  This is a behavioural ordering test;
+  // the scoreboard (two grants -> two ordered responses with correct data) is
+  // the primary check, with a white-box guard against the swallow bug.
   //
-  //   1. ACK is withheld and only A is requested, so the adapter drains the one
-  //      FIFO entry and lands in CLASSICQ (FIFO empty at PREPARE1 => no burst).
-  //      The classic transfer then stalls there awaiting ACK.
-  //   2. While stalled in CLASSICQ the second, address-sequential read A+4 is
-  //      granted and parked in the FIFO (burst_valid is now high).
-  //   3. ACK is released.  The classic ACK for A must complete WITHOUT popping
-  //      A+4; A+4 is then picked up as its own transfer and responds second.
+  //   1. ACK is withheld and only A is requested.  At PREPARE1 the next entry
+  //      is not yet visible in slot1, so no burst opens and the adapter lands in
+  //      CLASSICQ servicing A alone; A was popped from the preload buffer in
+  //      PREPARE1.  The classic transfer then stalls awaiting ACK.
+  //   2. While stalled in CLASSICQ the sequential read A+4 is granted and parks
+  //      in slot0 of the preload buffer.
+  //   3. ACK is released.  A's classic ACK must complete WITHOUT popping the
+  //      preload buffer (which would discard the parked A+4); A+4 is then picked
+  //      up as its own classic transfer and responds second.
   //
-  // The white-box invariant (check_classic_fifo) catches the stray FIFO pop:
-  // in CLASSICQ the adapter sets fifo_rd_wb_ctrl=0, so fifo_rd_en = wb_ack &
-  // burst_valid; with A+4 parked, burst_valid is high and the classic ACK would
-  // wrongly pop it.
+  // The white-box invariant (check_classic_pop) catches the swallow directly:
+  // a preload_buffer_pop coincident with the classic ACK would drop A+4.
   task test_classic_incremental_received_later;
     begin
-      start_test("C13: two classic incremental transfers - 2nd received later, no FIFO pop in classic");
-      check_classic_fifo = 1'b1;
+      start_test("C13: two classic incremental transfers - 2nd received later, no pop on classic ACK");
+      check_classic_pop = 1'b1;
 
-      // Stall the first classic transfer so the second request can be parked
-      // in the FIFO while CLASSICQ is active.
+      // Stall the first classic transfer so the second request can be parked in
+      // the preload buffer while CLASSICQ is active.
       stop_ack();
       issue_read(32'h0000_0200);
       wait_classicq(40);
+      check(dut.wb_state == DUT_CLASSICQ, "expected to be in classic transfer");
 
-      check(dut.wb_state == DUT_CLASSICQ, "expected to still be in classic transfer");
+      // Park the sequential second request while still stalled in CLASSICQ.
       issue_read(32'h0000_0204);
+      check(dut.wb_state == DUT_CLASSICQ,
+            "must still be in classic transfer after parking 0x204");
+      check(grants_seen == 2, "both requests must be granted");
       check(responses_seen == 0,
             "no response may appear before the stalled classic transfer is ACKed");
 
-      // Arm the corner: wait for 0x204 to be visible at the FIFO head (so
-      // burst_valid is high) while still stalled in CLASSICQ.  Without this
-      // the FWFT latency lets the classic transfer finish before 0x204 is
-      // visible, and the invariant would never be exercised.
-      wait_classic_armed(40);
-      check(classic_armed, "could not arm classic-FIFO corner (0x204 not visible during CLASSICQ)");
-      check(dut.wb_state == DUT_CLASSICQ, "must still be in classic transfer once armed");
-
+      // Release ACKs: A completes its classic transfer, then A+4 is serviced as
+      // its own classic transfer.  The scoreboard fails if A+4 was swallowed
+      // (missing/extra response or data/order mismatch).
       set_ack_continuous();
       wait_responses(2, 60);
       expect_counts(2, 2);
