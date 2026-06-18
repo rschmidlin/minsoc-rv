@@ -202,7 +202,7 @@ void instruction_trace(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     if (top->minsoc_rv_top->ibexi_ack && (top->minsoc_rv_top->ibexi_adr != addr)) {
         addr = top->minsoc_rv_top->ibexi_adr;
         //(*output) << "Instr(" << std::hex << addr << "): " << std::dec << top->minsoc_rv_top->ibexi_dat_r << std::endl;
-        fprintf(instr_file, "Instr(0x%08x): 0x%08x @%d ps\n", addr, top->minsoc_rv_top->ibexi_dat_r, time);
+        fprintf(instr_file, "Instr(0x%08x): 0x%08x @%ld ps\n", addr, top->minsoc_rv_top->ibexi_dat_r, time);
     }
 }
 
@@ -216,10 +216,10 @@ void data_trace(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     if (top->minsoc_rv_top->ibexd_ack && (top->minsoc_rv_top->ibexd_adr != addr)) {
             addr = top->minsoc_rv_top->ibexi_adr;
         if (top->minsoc_rv_top->ibexd_we) {
-            fprintf(data_file, "Data WR(0x%08x): 0x%08x @%d ps\n", addr, top->minsoc_rv_top->ibexd_dat_w, time);
+            fprintf(data_file, "Data WR(0x%08x): 0x%08x @%ld ps\n", addr, top->minsoc_rv_top->ibexd_dat_w, time);
         }
         else {
-            fprintf(data_file, "Data RD(0x%08x): 0x%08x @%d ps\n", addr, top->minsoc_rv_top->ibexd_dat_r, time);
+            fprintf(data_file, "Data RD(0x%08x): 0x%08x @%ld ps\n", addr, top->minsoc_rv_top->ibexd_dat_r, time);
         }
     }
 }
