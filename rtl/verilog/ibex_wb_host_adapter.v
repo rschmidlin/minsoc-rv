@@ -174,10 +174,10 @@ always @(posedge clk) begin
         wb_bte <= 2'b00;
     
         preload_buffer_pop <= 1'b0;
-        
+
         resp_valid <= 1'b0;
 
-        if (slot0_valid) begin
+        if (slot0_valid && !preload_buffer_pop) begin
           preload_buffer_pop <= 1'b1;
           wb_state <= PREPARE1;
         end
@@ -242,6 +242,9 @@ always @(posedge clk) begin
       end
       FINISH: begin
         resp_valid <= 1'b0;
+
+        preload_buffer_pop <= 1'b0;
+        
         if (wb_ack) begin
           resp_valid <= 1'b1;
           
