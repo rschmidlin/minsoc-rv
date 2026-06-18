@@ -71,6 +71,8 @@ Encountered problems:
 
   - 7) Testbench is not working properly because of combinatorial FIFO read: FIFO ends up reading more than expected. 
 
+  - 8) Preload buffer burst_addr_valid logic is tweaked by slot2 (0x88) and slot 1 (0x84) on a new range but incremental while adapter is still processing slot 0 (0x15C). Burst is not cancelled. 
+
 Missing points:
   - 1) [X] Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
   - 2) [X] double-check fifo size because it is never full
