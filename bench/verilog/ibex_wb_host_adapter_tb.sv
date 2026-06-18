@@ -1265,11 +1265,92 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+  // C18: mid-window address break with sequential addresses on BOTH sides.
+  //
+  // Regression for README.md § Cache, encountered problem 8:
+  //   "Preload buffer burst_addr_valid logic is tweaked by slot2 (0x88) and
+  //    slot 1 (0x84) on a new range but incremental while adapter is still
+  //    processing slot 0 (0x15C). Burst is not cancelled."
+  //   Solution: "Also check for burst_valid in BURST state."
+  //
+  // Requests arrive 0x158, 0x15c, 0x084, 0x088.  The first pair is sequential
+  // (0x158 -> 0x15c, +4) and the last pair is sequential (0x084 -> 0x088, +4),
+  // but the middle step 0x15c -> 0x084 is an address break.  C7/C8/C9/C12 all
+  // end a burst with a *single* non-sequential entry; none of them place a
+  // second sequential pair immediately after the break, which is what makes
+  // this corner distinct.
+  //
+  // The bug it isolates: PREPARE1 checks slot0->slot1 (0x158->0x15c) to open the
+  // burst, and BURST checks slot1->slot2 (after the preload buffer pops, that is
+  // 0x084->0x088) to continue it -- so the middle step 0x15c->0x084 is never
+  // checked by either.  Because the post-break addresses 0x084/0x088 are
+  // themselves sequential, burst_addr_valid_q (slot2 == slot1 + 4) stays high
+  // and masks the break.  Only by ALSO checking burst_valid (slot1 == slot0 + 4)
+  // in BURST -- the README fix at line 235 -- does the adapter cancel the burst
+  // at 0x15c.
+  //
+  // Detection: if the burst is not cancelled the adapter runs a phantom 0x160
+  // beat; the slave returns mem_data_for_addr(0x160), but the scoreboard expects
+  // the third granted address 0x084, so the per-response data check fails (and
+  // the response stream desynchronises from grant order).  With the fix the
+  // burst stops at 0x15c, a fresh WB cycle services 0x084/0x088, and all four
+  // responses stay aligned to grant order.
+  task test_midburst_break_with_sequential_after;
+    integer granted;
+    integer waited;
+    reg [31:0] addrs [0:3];
+    begin
+      start_test("C18: mid-window break (0x158,0x15c | 0x084,0x088) must cancel burst at 0x15c");
+      stop_ack();
+
+      addrs[0] = 32'h0000_0158;
+      addrs[1] = 32'h0000_015c;
+      addrs[2] = 32'h0000_0084;
+      addrs[3] = 32'h0000_0088;
+
+      // Pile all four into the FIFO/preload buffer while the WB side is stalled,
+      // so when acks are released the adapter reaches a BURST cycle with
+      // slot0=0x15c, slot1=0x084, slot2=0x088 resident -- the exact slot window
+      // the bug mis-evaluates.
+      granted = 0;
+      waited  = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (granted < 4 && waited < 60) begin
+        req_addr = addrs[granted];
+        @(posedge clk);
+        if (gnt) granted = granted + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      if (granted < 4) fail("C18: not all four requests were granted");
+
+      // Release the WB side and drain.  The scoreboard verifies each response's
+      // data against its granted address, so a phantom 0x160 beat fails there.
+      set_ack_continuous();
+      wait_responses(4, 160);
+      expect_counts(4, 4);
+
+      check(sb_addr[0] == 32'h0000_0158, "C18: first grant 0x158");
+      check(sb_addr[1] == 32'h0000_015c, "C18: second grant 0x15c");
+      check(sb_addr[2] == 32'h0000_0084, "C18: third grant 0x084 (after the break)");
+      check(sb_addr[3] == 32'h0000_0088, "C18: fourth grant 0x088");
+
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0, "C18: phantom resp_valid after both windows drain");
+      check(!wb_cyc, "C18: WB cycle must close after the run drains");
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
-  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 L1 GAP P6 C17
+  // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 L1 GAP P6 C17 C18
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -1299,6 +1380,7 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "L1")   test_fifo_full_latency();
     if (testcase_filter == "" || testcase_filter == "GAP")  test_fifo_full_with_req_gap();
     if (testcase_filter == "" || testcase_filter == "C17")  test_fifo_empty_midburst();
+    if (testcase_filter == "" || testcase_filter == "C18")  test_midburst_break_with_sequential_after();
     if (testcase_filter == "" || testcase_filter == "P6")   test_finish_no_extra_fifo_rd_en();
 
     if (errors == 0)
