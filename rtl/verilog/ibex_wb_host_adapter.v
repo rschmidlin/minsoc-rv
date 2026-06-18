@@ -73,61 +73,71 @@ fifo_fwft #(
 assign fifo_wr_en = req_valid & ~fifo_full;
 assign gnt = fifo_wr_en;
 
+wire slot0_valid;
+wire slot1_valid;
+reg slot1_req, slot2_req, preload_buffer_pop;
 
-// Recognize fifo_empty one read cycle ahead
-reg [31:0] fifo_req_addr_q, fifo_req_addr_qq;
-reg fifo_req_we_q, fifo_req_we_qq;
-reg [3:0] fifo_req_be_q, fifo_req_be_qq;
-reg [31:0] fifo_req_wdata_q, fifo_req_wdata_qq;
+wire [31:0] slot0_addr, slot1_addr, slot2_addr;
+wire slot0_we, slot1_we, slot2_we;
+wire [3:0] slot0_be, slot1_be, slot2_be;
+wire [31:0] slot0_wdata, slot1_wdata, slot2_wdata;
 
-always @(posedge clk) begin
-  if (rst) begin
-    fifo_req_we_q <= 1'b0;
-    fifo_req_be_q <= 4'h0;
-    fifo_req_wdata_q <= 32'h0000_0000;
-    fifo_req_addr_q <= 32'h0000_0000;
-    
-    fifo_req_we_qq <= 1'b0;
-    fifo_req_be_qq <= 4'h0;
-    fifo_req_wdata_qq <= 32'h0000_0000;
-    fifo_req_addr_qq <= 32'h0000_0000;
-  end
-  if (fifo_rd_en) begin
-    fifo_req_we_q <= fifo_req_we;
-    fifo_req_be_q <= fifo_req_be;
-    fifo_req_wdata_q <= fifo_req_wdata;
-    fifo_req_addr_q <= fifo_req_addr;    
-    
-    fifo_req_we_qq <= fifo_req_we_q;
-    fifo_req_be_qq <= fifo_req_be_q;
-    fifo_req_wdata_qq <= fifo_req_wdata_q;
-    fifo_req_addr_qq <= fifo_req_addr_q;    
-  end
-end
+ibex_wb_adapter_preload_buffer #(
+  .DATA_WIDTH(69)
+) ibex_wb_adapter_preload_buffer_i(
+  .clk(clk),
+  .rst(rst),
+
+  .fifo_dout({fifo_req_we, fifo_req_be, fifo_req_wdata, fifo_req_addr}),
+  .fifo_empty(fifo_empty),
+  .rd_en(fifo_rd_en),
+
+  .slot0_valid(slot0_valid),
+  .slot0_data({slot0_we, slot0_be, slot0_wdata, slot0_addr}),
+  .slot0_pop(preload_buffer_pop),
+
+  .slot1_valid(slot1_valid),
+  .slot1_data({slot1_we, slot1_be, slot1_wdata, slot1_addr}),
+  
+  .slot2_valid(slot2_valid),
+  .slot2_data({slot2_we, slot2_be, slot2_wdata, slot2_addr})
+);
 
 wire burst_rw_consistent;
 wire burst_be_consistent;
 wire burst_addr_valid;
+
+wire slots_valid;
 wire burst_valid;
 
-assign burst_rw_consistent = (fifo_req_we == fifo_req_we_q);
-assign burst_be_consistent = (fifo_req_be == fifo_req_be_q);
-assign burst_addr_valid = (fifo_req_addr == (fifo_req_addr_q + 'd4));
-assign burst_valid = (burst_addr_valid & burst_be_consistent & burst_rw_consistent);
+assign burst_rw_consistent = (slot1_we == slot0_we);
+assign burst_be_consistent = (slot1_be == slot0_be);
+assign burst_addr_valid = (slot1_addr == (slot0_addr + 'd4));
 
+assign slots_valid = (slot0_valid & slot1_valid);
 
-reg fifo_rd_wb_ctrl;
-reg fifo_wb_rd;
-assign fifo_rd_en = fifo_rd_wb_ctrl ? fifo_wb_rd : (wb_ack & burst_valid);
+assign burst_valid = (slots_valid & burst_addr_valid & burst_be_consistent & burst_rw_consistent);
+
+wire burst_rw_consistent_q;
+wire burst_be_consistent_q;
+wire burst_addr_valid_q;
+
+wire slots_valid_q;
+wire burst_valid_q;
+
+assign burst_rw_consistent_q = (slot2_we == slot1_we);
+assign burst_be_consistent_q = (slot2_be == slot1_be);
+assign burst_addr_valid_q = (slot2_addr == (slot1_addr + 'd4));
+
+assign slots_valid_q = (slot1_valid & slot2_valid);
+
+assign burst_valid_q = (slots_valid_q & burst_addr_valid_q & burst_be_consistent_q & burst_rw_consistent_q);
 
 reg [3:0] wb_state;
 
 localparam IDLE = 4'b0000;
-localparam FIFO_WAIT1 = 4'b0001;
 localparam PREPARE1 = 4'b0010;
 localparam CLASSIC = 4'b0101;
-localparam FIFO_WAIT2 = 4'b0011;
-localparam PREPARE2 = 4'b0100;
 localparam BURST = 4'b0110;
 localparam FINISH = 4'b0111;
 
@@ -149,8 +159,7 @@ always @(posedge clk) begin
     resp_rdata <= 32'h0000_0000;
     resp_valid <= 1'b0;
 
-    fifo_rd_wb_ctrl <= 1'b1;
-    fifo_wb_rd <= 1'b0;
+    preload_buffer_pop <= 1'b0;
   end
   else begin
     case (wb_state)
@@ -163,77 +172,69 @@ always @(posedge clk) begin
         wb_sel <= 4'h0;
         wb_cti <= 3'b000;
         wb_bte <= 2'b00;
-
-        fifo_rd_wb_ctrl <= 1'b1;
-        fifo_wb_rd <= 1'b0;
+    
+        preload_buffer_pop <= 1'b0;
+        
         resp_valid <= 1'b0;
 
-        if (!fifo_empty) begin
-          fifo_wb_rd <= 1'b1;
-          wb_state <= FIFO_WAIT1;
+        if (slot0_valid) begin
+          preload_buffer_pop <= 1'b1;
+          wb_state <= PREPARE1;
         end
-      end
-      FIFO_WAIT1: begin
-        fifo_wb_rd <= 1'b0;
-        wb_state <= PREPARE1;
       end
       PREPARE1: begin        
-        if (!fifo_empty && burst_valid) begin
-          fifo_wb_rd <= 1'b1;
-          wb_state <= FIFO_WAIT2;
+        if (slot1_valid && burst_valid) begin
+          preload_buffer_pop <= 1'b0;
+          wb_we <= slot0_we;
+          wb_adr <= slot0_addr;
+          wb_dat_w <= slot0_wdata;
+          wb_sel <= slot0_be;
+          wb_state <= BURST;
         end
         else begin
-          fifo_wb_rd <= 1'b0;
+          preload_buffer_pop <= 1'b0;
           wb_state <= CLASSIC;
         end
       end
       CLASSIC: begin
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
-        wb_we <= fifo_req_we_q;
-        wb_adr <= fifo_req_addr_q;
-        wb_dat_w <= fifo_req_wdata_q;
-        wb_sel <= fifo_req_be_q;
+        wb_we <= slot0_we;
+        wb_adr <= slot0_addr;
+        wb_dat_w <= slot0_wdata;
+        wb_sel <= slot0_be;
         if (wb_ack) begin
           resp_rdata <= wb_dat_r;
           resp_valid <= 1'b1;
 
           wb_cyc <= 1'b0;
           wb_stb <= 1'b0;
+
+          preload_buffer_pop <= 1'b1;
+
           wb_state <= IDLE;
         end
       end
-      FIFO_WAIT2: begin
-        fifo_wb_rd <= 1'b0;
-        wb_state <= PREPARE2;
-      end
-      PREPARE2: begin
-        fifo_wb_rd <= 1'b0;
+      BURST: begin
+        resp_valid <= 1'b0;
 
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
 
         wb_cti <= 3'b010;
         wb_bte <= 2'b00;
-
-        wb_we <= fifo_req_we_qq;
-        wb_adr <= fifo_req_addr_qq;
-        wb_dat_w <= fifo_req_wdata_qq;
-        wb_sel <= fifo_req_be_qq;
         
-        wb_state <= BURST;
-      end
-      BURST: begin
-        resp_valid <= 1'b0;
-        fifo_rd_wb_ctrl <= 1'b0;
+        preload_buffer_pop <= 1'b0;
+
         if (wb_ack) begin
           wb_adr <= wb_adr + 'd4;
           resp_rdata <= wb_dat_r;
-          wb_dat_w <= fifo_req_wdata_q;
+          wb_dat_w <= slot1_wdata;
           resp_valid <= 1'b1;
 
-          if (fifo_empty || !burst_valid) begin
-            fifo_rd_wb_ctrl <= 1'b1;
+          preload_buffer_pop <= 1'b1;
+
+          if (!slot1_valid || !(burst_valid || burst_valid_q)) begin
             wb_cti <= 3'b111;
             wb_state <= FINISH;
           end
@@ -245,13 +246,14 @@ always @(posedge clk) begin
           resp_valid <= 1'b1;
           
           resp_rdata <= wb_dat_r;
-          wb_dat_w <= fifo_req_wdata_q;
           wb_adr <= 32'h0000_0000;
 
           wb_cyc <= 1'b0;
           wb_stb <= 1'b0;
           wb_cti <= 3'b000;
           wb_bte <= 2'b00;
+
+          preload_buffer_pop <= 1'b1;
 
           wb_state <= IDLE;
         end

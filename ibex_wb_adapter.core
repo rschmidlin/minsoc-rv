@@ -9,6 +9,7 @@ filesets:
     files:
       - rtl/verilog/ibex_wb_host_adapter.v
       - rtl/verilog/wb_ibex_device_adapter.v
+      - rtl/verilog/ibex_wb_adapter_preload_buffer.v
     file_type: verilogSource
     depend:
       - "fifo"

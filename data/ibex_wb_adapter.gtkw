@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Tue Jun 16 09:31:11 2026
+[*] Thu Jun 18 09:15:41 2026
 [*]
 [dumpfile] "/home/raul/workspace/build/ibex_wb_adapter_0.1/sim/testlog.vcd"
-[dumpfile_mtime] "Tue Jun 16 09:29:13 2026"
-[dumpfile_size] 10400
+[dumpfile_mtime] "Thu Jun 18 09:14:34 2026"
+[dumpfile_size] 18300
 [savefile] "/home/raul/workspace/minsoc-rv/data/ibex_wb_adapter.gtkw"
-[timestart] 0
+[timestart] 842500
 [size] 1920 985
 [pos] -1 -1
-*-15.141920 79300 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.441921 999700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] ibex_wb_host_adapter_tb.
 [treeopen] ibex_wb_host_adapter_tb.dut.
 [sst_width] 297
@@ -39,16 +39,24 @@ ibex_wb_host_adapter_tb.dut.wb_adr[31:0]
 ibex_wb_host_adapter_tb.dut.wb_cti[2:0]
 ibex_wb_host_adapter_tb.dut.wb_cyc
 ibex_wb_host_adapter_tb.dut.wb_stb
-ibex_wb_host_adapter_tb.dut.wb_state[1:0]
-ibex_wb_host_adapter_tb.dut.fifo_rd_en
-ibex_wb_host_adapter_tb.dut.fifo_empty
-@22
-ibex_wb_host_adapter_tb.dut.fifo_req_addr[31:0]
-ibex_wb_host_adapter_tb.dut.fifo_req_addr_q[31:0]
 @420
 ibex_wb_host_adapter_tb.sb_rd
 ibex_wb_host_adapter_tb.sb_wr
 ibex_wb_host_adapter_tb.grants_seen
 ibex_wb_host_adapter_tb.responses_seen
+@28
+ibex_wb_host_adapter_tb.dut.burst_valid
+ibex_wb_host_adapter_tb.dut.burst_valid_q
+ibex_wb_host_adapter_tb.dut.slot0_valid
+ibex_wb_host_adapter_tb.dut.slot1_valid
+ibex_wb_host_adapter_tb.dut.slot2_valid
+@22
+ibex_wb_host_adapter_tb.dut.slot0_addr[31:0]
+ibex_wb_host_adapter_tb.dut.slot1_addr[31:0]
+ibex_wb_host_adapter_tb.dut.slot2_addr[31:0]
+@28
+ibex_wb_host_adapter_tb.dut.preload_buffer_pop
+@23
+ibex_wb_host_adapter_tb.dut.fifo_req_addr[31:0]
 [pattern_trace] 1
 [pattern_trace] 0
