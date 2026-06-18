@@ -54,12 +54,6 @@ wire [3:0] fifo_req_be;
 wire [31:0] fifo_req_wdata;
 wire [31:0] fifo_req_addr;
 
-reg [31:0] req_addr_q;
-reg req_we_q;
-reg [3:0] req_be_q;
-reg [31:0] req_wdata_q;
-reg req_valid_q;
-
 
 // Store req_addr & req_be 
 fifo_fwft #(
@@ -76,27 +70,8 @@ fifo_fwft #(
     .empty(fifo_empty)
 );
 
-always @(posedge clk) begin
-  if (rst) begin
-    req_we_q <= 1'b0;
-    req_be_q <= 4'h0;
-    req_wdata_q <= 32'h0000_0000;
-    req_addr_q <= 32'h0000_0000;
-    req_valid_q <= 1'b0;
-  end
-  else begin
-    if (fifo_wr_en) begin
-      req_we_q <= req_we;
-      req_be_q <= req_be;
-      req_wdata_q <= req_wdata;
-      req_addr_q <= req_addr;
-      req_valid_q <= req_valid;
-    end
-  end
-end
-
 assign fifo_wr_en = req_valid & ~fifo_full;
-assign gnt = fifo_wr_en/* & req_valid*/;
+assign gnt = fifo_wr_en;
 
 
 // Recognize fifo_empty one read cycle ahead
@@ -143,18 +118,16 @@ assign burst_valid = (burst_addr_valid & burst_be_consistent & burst_rw_consiste
 
 reg fifo_rd_wb_ctrl;
 reg fifo_wb_rd;
-reg fifo_rd_en_direct;
 assign fifo_rd_en = fifo_rd_wb_ctrl ? fifo_wb_rd : (wb_ack & burst_valid);
-//assign fifo_rd_en = fifo_rd_en_direct;
 
 reg [3:0] wb_state;
 
 localparam IDLE = 4'b0000;
 localparam FIFO_WAIT1 = 4'b0001;
 localparam PREPARE1 = 4'b0010;
+localparam CLASSIC = 4'b0101;
 localparam FIFO_WAIT2 = 4'b0011;
 localparam PREPARE2 = 4'b0100;
-localparam CLASSICQ = 4'b0101;
 localparam BURST = 4'b0110;
 localparam FINISH = 4'b0111;
 
@@ -178,7 +151,6 @@ always @(posedge clk) begin
 
     fifo_rd_wb_ctrl <= 1'b1;
     fifo_wb_rd <= 1'b0;
-    fifo_rd_en_direct <= 1'b0;
   end
   else begin
     case (wb_state)
@@ -197,35 +169,45 @@ always @(posedge clk) begin
         resp_valid <= 1'b0;
 
         if (!fifo_empty) begin
-          fifo_rd_en_direct <= 1'b1;
           fifo_wb_rd <= 1'b1;
           wb_state <= FIFO_WAIT1;
         end
       end
       FIFO_WAIT1: begin
-        fifo_rd_en_direct <= 1'b0;
         fifo_wb_rd <= 1'b0;
         wb_state <= PREPARE1;
       end
       PREPARE1: begin        
         if (!fifo_empty && burst_valid) begin
-          fifo_rd_en_direct <= 1'b1;
           fifo_wb_rd <= 1'b1;
           wb_state <= FIFO_WAIT2;
         end
         else begin
-          fifo_rd_en_direct <= 1'b0;
           fifo_wb_rd <= 1'b0;
-          wb_state <= CLASSICQ;
+          wb_state <= CLASSIC;
+        end
+      end
+      CLASSIC: begin
+        wb_cyc <= 1'b1;
+        wb_stb <= 1'b1;
+        wb_we <= fifo_req_we_q;
+        wb_adr <= fifo_req_addr_q;
+        wb_dat_w <= fifo_req_wdata_q;
+        wb_sel <= fifo_req_be_q;
+        if (wb_ack) begin
+          resp_rdata <= wb_dat_r;
+          resp_valid <= 1'b1;
+
+          wb_cyc <= 1'b0;
+          wb_stb <= 1'b0;
+          wb_state <= IDLE;
         end
       end
       FIFO_WAIT2: begin
-        fifo_rd_en_direct <= 1'b0;
         fifo_wb_rd <= 1'b0;
         wb_state <= PREPARE2;
       end
       PREPARE2: begin
-        fifo_rd_en_direct <= 1'b0;
         fifo_wb_rd <= 1'b0;
 
         wb_cyc <= 1'b1;
@@ -242,11 +224,9 @@ always @(posedge clk) begin
         wb_state <= BURST;
       end
       BURST: begin
-        fifo_rd_en_direct <= 1'b0;
         resp_valid <= 1'b0;
         fifo_rd_wb_ctrl <= 1'b0;
         if (wb_ack) begin
-          fifo_rd_en_direct <= 1'b1;
           wb_adr <= wb_adr + 'd4;
           resp_rdata <= wb_dat_r;
           wb_dat_w <= fifo_req_wdata_q;
@@ -259,36 +239,14 @@ always @(posedge clk) begin
           end
         end
       end
-      CLASSICQ: begin
-        fifo_rd_en_direct <= 1'b0;
-        wb_cyc <= 1'b1;
-        wb_stb <= 1'b1;
-        wb_we <= fifo_req_we_q;
-        wb_adr <= fifo_req_addr_q;
-        wb_dat_w <= fifo_req_wdata_q;
-        wb_sel <= fifo_req_be_q;
-        if (wb_ack) begin
-          fifo_rd_en_direct <= 1'b1;
-          resp_rdata <= wb_dat_r;
-          resp_valid <= 1'b1;
-
-          wb_cyc <= 1'b0;
-          wb_stb <= 1'b0;
-          wb_state <= IDLE;
-        end
-      end
       FINISH: begin
-        fifo_rd_en_direct <= 1'b0;
         resp_valid <= 1'b0;
-        if (wb_ack /*&& wb_stb*/) begin
-          fifo_rd_en_direct <= 1'b1;
+        if (wb_ack) begin
           resp_valid <= 1'b1;
           
           resp_rdata <= wb_dat_r;
           wb_dat_w <= fifo_req_wdata_q;
           wb_adr <= 32'h0000_0000;
-
-          //fifo_wb_rd <= 1'b1;
 
           wb_cyc <= 1'b0;
           wb_stb <= 1'b0;
