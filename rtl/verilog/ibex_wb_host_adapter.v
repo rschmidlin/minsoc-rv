@@ -117,8 +117,8 @@ assign burst_addr_valid = (slot1_addr == (slot0_addr + 'd4));
 assign slots_valid = (slot0_valid & slot1_valid);
 
 wire fifo_forward;
-assign fifo_forward = fifo_rd_en && preload_buffer_pop;
-assign burst_break_fifo_forward = fifo_forward && fifo_empty;
+assign fifo_forward = /*fifo_rd_en & */preload_buffer_pop & ~slot2_valid;
+assign burst_break_fifo_forward = fifo_forward & fifo_empty;
 
 assign burst_valid = (slots_valid & burst_addr_valid & burst_be_consistent & burst_rw_consistent);
 
@@ -187,11 +187,12 @@ always @(posedge clk) begin
       end
       PREPARE1: begin        
         preload_buffer_pop <= 1'b1;
+        wb_we <= slot0_we;
+        wb_adr <= slot0_addr;
+        wb_dat_w <= slot0_wdata;
+        wb_sel <= slot0_be;
+
         if (slot1_valid && burst_valid) begin
-          wb_we <= slot0_we;
-          wb_adr <= slot0_addr;
-          wb_dat_w <= slot0_wdata;
-          wb_sel <= slot0_be;
           wb_state <= BURST;
         end
         else begin
@@ -201,10 +202,6 @@ always @(posedge clk) begin
       CLASSIC: begin
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
-        wb_we <= slot0_we;
-        wb_adr <= slot0_addr;
-        wb_dat_w <= slot0_wdata;
-        wb_sel <= slot0_be;
 
         preload_buffer_pop <= 1'b0;
         if (wb_ack) begin
@@ -213,8 +210,6 @@ always @(posedge clk) begin
 
           wb_cyc <= 1'b0;
           wb_stb <= 1'b0;
-
-          preload_buffer_pop <= 1'b1;
 
           wb_state <= IDLE;
         end
@@ -233,20 +228,23 @@ always @(posedge clk) begin
         if (wb_ack) begin
           wb_adr <= wb_adr + 'd4;
           resp_rdata <= wb_dat_r;
-          wb_dat_w <= slot1_wdata;
+          // resp_valid signals whether we got an ack previosly and consequently have popped the buffer
+          wb_dat_w <= (resp_valid) ? slot1_wdata : slot0_wdata;
           resp_valid <= 1'b1;
 
           preload_buffer_pop <= 1'b1;
 
           if (burst_break_fifo_forward || !slot1_valid || !(burst_valid/* || burst_valid_q*/)) begin
             wb_cti <= 3'b111;
+            preload_buffer_pop <= 1'b1;
+            wb_dat_w <= resp_valid ? slot1_wdata : slot0_wdata;
             wb_state <= FINISH;
           end
         end
       end
       FINISH: begin
         resp_valid <= 1'b0;
-
+        
         preload_buffer_pop <= 1'b0;
         
         if (wb_ack) begin
