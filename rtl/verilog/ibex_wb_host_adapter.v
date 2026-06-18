@@ -107,20 +107,17 @@ wire burst_rw_consistent;
 wire burst_be_consistent;
 wire burst_addr_valid;
 
-wire slots_valid;
 wire burst_valid;
 
 assign burst_rw_consistent = (slot1_we == slot0_we);
 assign burst_be_consistent = (slot1_be == slot0_be);
 assign burst_addr_valid = (slot1_addr == (slot0_addr + 'd4));
 
-assign slots_valid = (slot0_valid & slot1_valid);
-
 wire fifo_forward;
-assign fifo_forward = /*fifo_rd_en & */preload_buffer_pop & ~slot2_valid;
+assign fifo_forward = fifo_rd_en & preload_buffer_pop & ~slot2_valid;
 assign burst_break_fifo_forward = fifo_forward & fifo_empty;
 
-assign burst_valid = (slots_valid & burst_addr_valid & burst_be_consistent & burst_rw_consistent);
+assign burst_valid = (burst_addr_valid & burst_be_consistent & burst_rw_consistent);
 
 wire burst_rw_consistent_q;
 wire burst_be_consistent_q;
@@ -134,6 +131,16 @@ assign burst_be_consistent_q = (slot2_be == slot1_be);
 assign burst_addr_valid_q = (slot2_addr == (slot1_addr + 'd4));
 
 assign burst_valid_q = burst_addr_valid_q & burst_be_consistent_q & burst_rw_consistent_q;
+
+wire burst_rw_consistent_qq;
+wire burst_be_consistent_qq;
+wire burst_addr_valid_qq;
+wire burst_valid_qq;
+
+assign burst_rw_consistent_qq = (fifo_req_we == slot1_we);
+assign burst_be_consistent_qq = (fifo_req_be == slot1_be);
+assign burst_addr_valid_qq = (fifo_req_addr == (slot1_addr + 'd4));
+assign burst_valid_qq = burst_addr_valid_qq & burst_be_consistent_qq & burst_rw_consistent_qq;
 
 reg [3:0] wb_state;
 
@@ -232,7 +239,11 @@ always @(posedge clk) begin
 
           preload_buffer_pop <= 1'b1;
 
-          if ((!slot2_valid && !fifo_empty) || !burst_valid_q || !burst_valid) begin
+          if ((!slot1_valid)
+           || (!slot2_valid && fifo_empty) 
+           || (slot1_valid && !burst_valid)
+           || (slot2_valid && !burst_valid_q) 
+           || (fifo_forward && !burst_valid_qq)) begin
             wb_cti <= 3'b111;
             preload_buffer_pop <= 1'b1;
             wb_dat_w <= resp_valid ? slot1_wdata : slot0_wdata;
