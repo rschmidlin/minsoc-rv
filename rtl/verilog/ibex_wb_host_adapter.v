@@ -182,13 +182,12 @@ always @(posedge clk) begin
         resp_valid <= 1'b0;
 
         if (slot0_valid && !preload_buffer_pop) begin
-          preload_buffer_pop <= 1'b1;
           wb_state <= PREPARE1;
         end
       end
       PREPARE1: begin        
+        preload_buffer_pop <= 1'b1;
         if (slot1_valid && burst_valid) begin
-          preload_buffer_pop <= 1'b0;
           wb_we <= slot0_we;
           wb_adr <= slot0_addr;
           wb_dat_w <= slot0_wdata;
@@ -196,7 +195,6 @@ always @(posedge clk) begin
           wb_state <= BURST;
         end
         else begin
-          preload_buffer_pop <= 1'b0;
           wb_state <= CLASSIC;
         end
       end
@@ -207,6 +205,8 @@ always @(posedge clk) begin
         wb_adr <= slot0_addr;
         wb_dat_w <= slot0_wdata;
         wb_sel <= slot0_be;
+
+        preload_buffer_pop <= 1'b0;
         if (wb_ack) begin
           resp_rdata <= wb_dat_r;
           resp_valid <= 1'b1;

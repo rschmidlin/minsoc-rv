@@ -61,7 +61,9 @@ always @(posedge clk) begin
             slot1_valid <= 1'b1;
             slot1_data <= fifo_dout;
             
-            slot0_data <= slot1_data;
+            // Keep last valid data in slot 0 data
+            if (slot1_valid) 
+                slot0_data <= slot1_data;
             slot0_valid <= slot1_valid;
         end
         else begin
@@ -72,29 +74,25 @@ always @(posedge clk) begin
                 slot1_valid <= slot2_valid;
                 slot1_data <= slot2_data;
                 
-                slot0_data <= slot1_data;
                 slot0_valid <= slot1_valid;
+                // Keep last valid data in slot 0 data
+                if (slot1_valid) 
+                    slot0_data <= slot1_data;
             end
             if (rd_en && !fifo_empty) begin
-                slot2_valid <= 1'b1;
-                slot2_data <= fifo_dout;
-
-                if (!slot0_pop_q) begin
-                    slot1_valid <= slot2_valid;
-                    slot1_data <= slot2_data;
-                    
-                    slot0_data <= slot1_data;
-                    slot0_valid <= slot1_valid;
+                if (!slot0_valid) begin
+                    slot0_valid <= 1'b1;
+                    slot0_data <= fifo_dout;
+                end
+                else if (!slot1_valid) begin
+                    slot1_valid <= 1'b1;
+                    slot1_data <= fifo_dout;
+                end
+                else if (!slot2_valid) begin
+                    slot2_valid <= 1'b1;
+                    slot2_data <= fifo_dout;
                 end
             end
-        end
-        if (!slot1_valid) begin
-            slot1_valid <= slot2_valid;
-            slot1_data <= slot2_data;
-        end
-        if (!slot0_valid) begin
-            slot0_data <= slot1_data;
-            slot0_valid <= slot1_valid;
         end
     end
 end
