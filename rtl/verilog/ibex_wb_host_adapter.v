@@ -116,6 +116,10 @@ assign burst_addr_valid = (slot1_addr == (slot0_addr + 'd4));
 
 assign slots_valid = (slot0_valid & slot1_valid);
 
+wire fifo_forward;
+assign fifo_forward = fifo_rd_en && preload_buffer_pop;
+assign burst_break_fifo_forward = fifo_forward && fifo_empty;
+
 assign burst_valid = (slots_valid & burst_addr_valid & burst_be_consistent & burst_rw_consistent);
 
 wire burst_rw_consistent_q;
@@ -234,7 +238,7 @@ always @(posedge clk) begin
 
           preload_buffer_pop <= 1'b1;
 
-          if (!slot1_valid || !(burst_valid || burst_valid_q)) begin
+          if (burst_break_fifo_forward || !slot1_valid || !(burst_valid/* || burst_valid_q*/)) begin
             wb_cti <= 3'b111;
             wb_state <= FINISH;
           end
@@ -256,7 +260,7 @@ always @(posedge clk) begin
           wb_cti <= 3'b000;
           wb_bte <= 2'b00;
 
-          preload_buffer_pop <= 1'b1;
+          //preload_buffer_pop <= 1'b1;
 
           wb_state <= IDLE;
         end

@@ -54,7 +54,7 @@ always @(posedge clk) begin
         slot2_data <= 'h0;
     end
     else begin
-        if (slot0_pop && rd_en) begin
+        if (slot0_pop && rd_en && !fifo_empty) begin
             slot2_valid <= 1'b0;
             slot2_data <= 'h0;
             
@@ -66,8 +66,8 @@ always @(posedge clk) begin
         end
         else begin
             if (slot0_pop) begin
-                slot2_valid <= 1'b1;
-                slot2_data <= fifo_dout;
+                slot2_valid <= 1'b0;
+                slot2_data <= 'h0;
                 
                 slot1_valid <= slot2_valid;
                 slot1_data <= slot2_data;
@@ -75,7 +75,7 @@ always @(posedge clk) begin
                 slot0_data <= slot1_data;
                 slot0_valid <= slot1_valid;
             end
-            if (rd_en) begin
+            if (rd_en && !fifo_empty) begin
                 slot2_valid <= 1'b1;
                 slot2_data <= fifo_dout;
 
@@ -88,13 +88,13 @@ always @(posedge clk) begin
                 end
             end
         end
-        if (!slot0_valid) begin
-            slot0_data <= slot1_data;
-            slot0_valid <= slot1_valid;
-        end
         if (!slot1_valid) begin
             slot1_valid <= slot2_valid;
             slot1_data <= slot2_data;
+        end
+        if (!slot0_valid) begin
+            slot0_data <= slot1_data;
+            slot0_valid <= slot1_valid;
         end
     end
 end
