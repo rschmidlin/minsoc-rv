@@ -72,6 +72,8 @@ Encountered problems:
   - 7) Testbench is not working properly because of combinatorial FIFO read: FIFO ends up reading more than expected. 
 
   - 8) Preload buffer burst_addr_valid logic is tweaked by slot2 (0x88) and slot 1 (0x84) on a new range but incremental while adapter is still processing slot 0 (0x15C). Burst is not cancelled. 
+    Problem: prepare checks slot0 & 1 for burst, burst checks slot 2 & 1 after prepare buffer is popped, meaning that there was no check for slot 1 and 2 according to the initial conditions. Since prepare buffer contains addresses, 0x158, 0x15C, 0x84, 0x88, it works if first two and last two are checked but nobody checks steps 0x15C to 0x84.  
+    Solution: 
 
 Missing points:
   - 1) [X] Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid

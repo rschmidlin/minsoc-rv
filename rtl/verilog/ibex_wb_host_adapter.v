@@ -232,7 +232,7 @@ always @(posedge clk) begin
 
           preload_buffer_pop <= 1'b1;
 
-          if ((!slot2_valid && !fifo_empty) || !burst_valid_q) begin
+          if ((!slot2_valid && !fifo_empty) || !burst_valid_q || !burst_valid) begin
             wb_cti <= 3'b111;
             preload_buffer_pop <= 1'b1;
             wb_dat_w <= resp_valid ? slot1_wdata : slot0_wdata;
