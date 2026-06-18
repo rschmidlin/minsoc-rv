@@ -48,6 +48,15 @@ Next steps:
 
 ## Cache
 
+| Variant                 | Main idea                                         | Strength                    | Weakness                        | Branch            |
+| ----------------------- | ------------------------------------------------- | --------------------------- | ------------------------------- |-------------------|
+| Direct FSM              | no real queue, state-driven translation           | small                       | fragile around redirects/bursts | wishbone-burst    |
+| Window/counter FSM      | accepted/transferred window tracking              | efficient                   | hard invariants                 | wishbone-burst-b2_working |
+| FIFO with Ibex-side FSM | FSM accepts from Ibex, then writes FIFO           | controlled, easier to stage | two control layers              | wishbone-burst-b3 |
+| FIFO directly on Ibex   | `req && gnt` pushes FIFO                          | clean OBI invariant         | WB side needs lookahead         | wishbone-burst-b4 |
+| FIFO + preload buffer   | direct FIFO plus explicit `slot0/slot1` lookahead | cleanest separation         | slightly more local buffering   | wishbone-burst-b5 |
+
+
 Encountered problems: 
   - 1) verschlucken von data, weil burst cut because of fifo_req_addr_q != wb_adr @236 ps
   - 2) attempt to modify to fifo_req_addr != wb_adrr + 4 led to verschlucken von response of address 94 - was already cut with 1
