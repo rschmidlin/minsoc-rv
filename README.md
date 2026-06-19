@@ -50,7 +50,8 @@ Next steps:
 
 Hints on how to debug: trace following signals to keep track of Ibex execution:
 
-```TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_id[31:0]
+```
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_id[31:0]
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_if[31:0]
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_c_id[15:0]
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_i[31:0]
@@ -62,7 +63,8 @@ TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.jump_set
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.jump_set_raw
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set_raw
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.if_stage_i.instr_is_compressed_id_o```
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.if_stage_i.instr_is_compressed_id_o
+```
 
 | Variant                 | Main idea                                         | Strength                    | Weakness                        | Branch            | 
 | ----------------------- | ------------------------------------------------- | --------------------------- | ------------------------------- |-------------------|
@@ -121,7 +123,7 @@ Missing points:
   - 2) [X] double-check fifo size because it is never full
   - 3) [X] fifo_last_beat logic seems not to work, maybe related to point nr. 2
   - 4) [X] req_len logic is meaningless, maybe remove
-  - 5) [ ] test if it works without activated cache
+  - 5) [X] test if it works without activated cache
   - 6) [X] Adapt wb_ibex_device_adapter to work with host burst requests
   - 7) [X] Check if ib_fsm could be replaced by Ibex directly connected to FIFO req_valid <-> wr_en
   - 8) [X] Only negate gnt if fifo_full, requires that wr_en is based on both req_valid and gnt
