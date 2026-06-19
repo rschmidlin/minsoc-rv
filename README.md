@@ -48,6 +48,22 @@ Next steps:
 
 ## Cache
 
+Hints on how to debug: trace following signals to keep track of Ibex execution:
+
+```TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_id[31:0]
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_if[31:0]
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_c_id[15:0]
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_i[31:0]
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_id[31:0]
+
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_valid_id
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.controller_i.BranchPredictor
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.jump_set
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.jump_set_raw
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set_raw
+TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.if_stage_i.instr_is_compressed_id_o```
+
 | Variant                 | Main idea                                         | Strength                    | Weakness                        | Branch            | 
 | ----------------------- | ------------------------------------------------- | --------------------------- | ------------------------------- |-------------------|
 | Direct FSM              | no real queue, state-driven translation           | small                       | fragile around redirects/bursts | wishbone-burst    |
