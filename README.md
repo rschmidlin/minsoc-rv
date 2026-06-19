@@ -48,6 +48,23 @@ Next steps:
 
 ## Cache
 
+Verification steps:
+
+Version 1:
+  waveform inspection
+
+Version 2:
+  instruction trace
+
+Version 3:
+  request/response trace
+
+Version 4:
+  scoreboard
+
+Version 5:
+  assertions
+
 Hints on how to debug: trace following signals to keep track of Ibex execution:
 
 ```
@@ -65,6 +82,15 @@ TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set_raw
 TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.if_stage_i.instr_is_compressed_id_o
 ```
+
+instr_rdata_i      raw bus/fetch response
+instr_rdata_id     instruction word visible in ID
+instr_rdata_c_id   compressed halfword visible in ID
+pc_if              IF-stage PC / next frontend position
+pc_id              ID-stage PC
+instr_valid_id     ID instruction is valid
+instr_is_compressed_id_o  why PC advances by 2 instead of 4
+jump_set / branch_set     control-flow decision
 
 | Variant                 | Main idea                                         | Strength                    | Weakness                        | Branch            | 
 | ----------------------- | ------------------------------------------------- | --------------------------- | ------------------------------- |-------------------|
