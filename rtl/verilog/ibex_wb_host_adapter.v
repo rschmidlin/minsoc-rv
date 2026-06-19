@@ -238,7 +238,11 @@ always @(posedge clk) begin
           resp_valid <= 1'b1;
 
           preload_buffer_pop <= 1'b1;
-
+                    
+          // fifo_dout is used as third-word lookahead (burst_valid_qq) only when the preload buffer
+          // pops slot0 and simultaneously reads the FIFO to refill slot1. Outside
+          // this condition, fifo_dout is not considered part of the visible request
+          // window and must not influence CTI/burst-end decisions.
           if ((!slot1_valid)
            || (!slot2_valid && fifo_empty) 
            || (slot1_valid && !burst_valid)
