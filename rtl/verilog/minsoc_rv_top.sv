@@ -38,7 +38,7 @@ module minsoc_rv_top #(
   wire [31:0] ibexd_dat_r /* verilator public */ = wb_s2m_ibexd_dat;
   wire [31:0] ibexd_adr /* verilator public */ = wb_m2s_ibexd_adr;
   wire ibexd_we       /* verilator public */ = wb_m2s_ibexd_we;
-  wire ibexd_dat_w /* verilator public */ = wb_m2s_ibexd_dat;
+  wire [31:0] ibexd_dat_w /* verilator public */ = wb_m2s_ibexd_dat;
 
 
   ////////////////////////////////////////////////////////////////////////
