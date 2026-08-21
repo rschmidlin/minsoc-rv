@@ -36,14 +36,14 @@ filesets:
       - ~wb_intercon-1.2
   xilinx_files:
     files:
-      - rtl/fpga/top_nexysa7.sv
+      - rtl/fpga/top_boolean.sv
     file_type: systemVerilogSource
     depend:
       - "lowrisc:prim_xilinx:all"
       - "lowrisc:ibex:fpga_xilinx_shared"
   files_constraints:
     files:
-      - data/pins_nexysa7.xdc
+      - data/pins_boolean.xdc
     file_type: xdc
 
 targets:
@@ -59,7 +59,7 @@ targets:
     toplevel:
       - "tool_icarus ? (minsoc_rv_tb)"
       - "tool_verilator ? (minsoc_rv_top)"
-      - "tool_vivado ? (top_nexysa7)"
+      - "tool_vivado ? (top_boolean)"
     generate:
       - wb_intercon
     flow_options:
@@ -107,7 +107,7 @@ targets:
     filesets_append:
       - files_constraints
     flow_options:
-      part: xc7a100tcsg324-2
+      part: xc7s50csga324-2
     parameters:
       - memfile
 
