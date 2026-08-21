@@ -61,9 +61,8 @@ fifo_fwft #(
 assign fifo_wr_en = req_valid & ~fifo_full;
 assign gnt = fifo_wr_en;
 
-wire slot0_valid;
-wire slot1_valid;
-reg slot1_req, slot2_req, preload_buffer_pop;
+wire slot0_valid, slot1_valid, slot2_valid;
+reg preload_buffer_pop;
 
 wire [31:0] slot0_addr, slot1_addr, slot2_addr;
 wire slot0_we, slot1_we, slot2_we;
@@ -103,15 +102,12 @@ assign burst_addr_valid = (slot1_addr == (slot0_addr + 'd4));
 
 wire fifo_forward;
 assign fifo_forward = fifo_rd_en & preload_buffer_pop & ~slot2_valid;
-assign burst_break_fifo_forward = fifo_forward & fifo_empty;
-
 assign burst_valid = (burst_addr_valid & burst_be_consistent & burst_rw_consistent);
 
 wire burst_rw_consistent_q;
 wire burst_be_consistent_q;
 wire burst_addr_valid_q;
 
-wire slots_valid_q;
 wire burst_valid_q;
 
 assign burst_rw_consistent_q = (slot2_we == slot1_we);
@@ -137,8 +133,6 @@ localparam PREPARE1 = 4'b0010;
 localparam CLASSIC = 4'b0101;
 localparam BURST = 4'b0110;
 localparam FINISH = 4'b0111;
-
-reg [31:0] wb_adr_q;
 
 always @(posedge clk) begin
   if (rst) begin
@@ -259,10 +253,21 @@ always @(posedge clk) begin
           wb_cti <= 3'b000;
           wb_bte <= 2'b00;
 
-          //preload_buffer_pop <= 1'b1;
-
           wb_state <= IDLE;
         end
+      end
+      default: begin
+        wb_cyc <= 1'b0;
+        wb_stb <= 1'b0;
+        wb_we <= 1'b0;
+        wb_adr <= 32'h0000_0000;
+        wb_dat_w <= 32'h0000_0000;
+        wb_sel <= 4'h0;
+        wb_cti <= 3'b000;
+        wb_bte <= 2'b00;
+        preload_buffer_pop <= 1'b0;
+        resp_valid <= 1'b0;
+        wb_state <= IDLE;
       end
     endcase
   end

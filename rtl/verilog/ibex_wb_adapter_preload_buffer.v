@@ -25,20 +25,12 @@ module ibex_wb_adapter_preload_buffer #(
     output reg slot2_valid,
     output reg [DATA_WIDTH-1:0] slot2_data
 );
-/*
-reg read, late_read;
-
-assign rd_en = (read & !slot0_pop) || late_read;
-*/
-
-reg slot0_pop_q;
 
 always @(posedge clk) begin
     if (rst) begin
         rd_en <= 1'b0;      
     end
     else begin
-        slot0_pop_q <= slot0_pop;
         rd_en <= 1'b0;
         if (!fifo_empty && (!slot1_valid || slot0_pop)) begin
             rd_en <= 1'b1;
