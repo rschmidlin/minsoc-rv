@@ -46,8 +46,8 @@ module minsoc_riscv_dbg #(
     input  logic [  BusWidth-1:0] master_wb_dat_r_i,
     input  logic                  master_wb_err_i,
     output logic [BusWidth/8-1:0] master_wb_sel_o,
-    output logic [            2:0] master_wb_cti_o,
-    output logic [            1:0] master_wb_bte_o,
+    output logic [           2:0] master_wb_cti_o,
+    output logic [           1:0] master_wb_bte_o,
 
     input  logic tck_i,    // JTAG test clock pad
     input  logic tms_i,    // JTAG test mode select pad
@@ -219,7 +219,7 @@ module minsoc_riscv_dbg #(
 
   assign slave_wb_err_o = 1'b0;  // no error for now
 
-/*
+  /*
  * Slave Ibex adapter
  */
   wb_ibex_device_adapter wb_ibex_device_adapter_i (

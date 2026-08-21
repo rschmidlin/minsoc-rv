@@ -30,15 +30,15 @@ module minsoc_rv_top #(
   `include "wb_intercon.vh"
 
   // Public aliases for testbench access (/* verilator public */ required for Verilator 5.x)
-  wire ibexi_ack     /* verilator public */ = wb_s2m_ibexi_ack;
-  wire [31:0] ibexi_dat_r /* verilator public */ = wb_s2m_ibexi_dat;
-  wire [31:0] ibexi_adr /* verilator public */ = wb_m2s_ibexi_adr;
-  
-  wire ibexd_ack     /* verilator public */ = wb_s2m_ibexd_ack;
-  wire [31:0] ibexd_dat_r /* verilator public */ = wb_s2m_ibexd_dat;
-  wire [31:0] ibexd_adr /* verilator public */ = wb_m2s_ibexd_adr;
-  wire ibexd_we       /* verilator public */ = wb_m2s_ibexd_we;
-  wire [31:0] ibexd_dat_w /* verilator public */ = wb_m2s_ibexd_dat;
+  wire        ibexi_ack  /* verilator public */ = wb_s2m_ibexi_ack;
+  wire [31:0] ibexi_dat_r  /* verilator public */ = wb_s2m_ibexi_dat;
+  wire [31:0] ibexi_adr  /* verilator public */ = wb_m2s_ibexi_adr;
+
+  wire        ibexd_ack  /* verilator public */ = wb_s2m_ibexd_ack;
+  wire [31:0] ibexd_dat_r  /* verilator public */ = wb_s2m_ibexd_dat;
+  wire [31:0] ibexd_adr  /* verilator public */ = wb_m2s_ibexd_adr;
+  wire        ibexd_we  /* verilator public */ = wb_m2s_ibexd_we;
+  wire [31:0] ibexd_dat_w  /* verilator public */ = wb_m2s_ibexd_dat;
 
 
   ////////////////////////////////////////////////////////////////////////
@@ -161,7 +161,7 @@ module minsoc_rv_top #(
       .DmBaseAddr     (debug_start_address),
       .DmHaltAddr     (debug_start_address + dm::HaltAddress[31:0]),
       .DmExceptionAddr(debug_start_address + dm::ExceptionAddress[31:0]),
-      .ICache(1)
+      .ICache         (1)
   ) ibex_wb_i (
       .clk_i (wb_clk),
       .rst_ni(rst_core_n),
@@ -224,8 +224,8 @@ module minsoc_rv_top #(
 
 
   minsoc_riscv_dbg #(
-      .NrHarts    (1),
-      .IdcodeValue(32'h11001cdf),
+      .NrHarts      (1),
+      .IdcodeValue  (32'h11001cdf),
       .DmBaseAddress('h1000)
   ) minsoc_riscv_dbg_i (
       .clk_i(wb_clk),
