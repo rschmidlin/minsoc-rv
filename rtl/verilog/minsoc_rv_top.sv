@@ -13,7 +13,8 @@ module minsoc_rv_top #(
     input  tck_pad_i,
     input  tdi_pad_i,
     input  uart_srx_i,
-    output uart_stx_o
+    output uart_stx_o,
+    inout [31:0] inoutputs
 );
 
   localparam debug_start_address = 32'h1A110000;
@@ -124,6 +125,23 @@ module minsoc_rv_top #(
       .wb_ack_o(wb_s2m_timer_ack),
       .wb_err_o(wb_s2m_timer_err),
       .wb_rty_o(wb_s2m_timer_rty)
+  );
+
+  // 
+  // GPIO
+  // 
+  gpio gpio_i (
+    .wb_clk_i(wb_clk_i),
+    .wb_rst_i(wb_rst_i),
+    .wb_cyc_i(wb_m2s_gpio_cyc),
+    .wb_stb_i(wb_m2s_gpio_stb),
+    .wb_adr_i(wb_m2s_gpio_adr),
+    .wb_we_i(wb_m2s_gpio_we),
+    .wb_dat_i(wb_m2s_gpio_dat),
+    .wb_dat_o(wb_s2m_gpio_dat),
+    .wb_ack_o(wb_s2m_gpio_ack),
+
+    .inoutput(inoutputs)
   );
 
 

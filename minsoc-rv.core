@@ -10,6 +10,8 @@ filesets:
       - rtl/verilog/minsoc_rv_top.sv
       - rtl/verilog/ibex_wb.sv
       - rtl/verilog/minsoc_riscv_dbg.sv
+      - rtl/verilog/gpio_regblock.v
+      - rtl/verilog/gpio.v
     file_type: verilogSource
     depend:
       - "lowrisc:ibex:ibex_top"
@@ -145,6 +147,7 @@ generate:
             - dbgs
             - uart
             - timer
+            - gpio
         dbgm:
           slaves:
             - mem
@@ -161,4 +164,7 @@ generate:
           size : 0x20
         timer:
           offset : 0x20001000
+          size : 0x20
+        gpio: 
+          offset : 0x20002000
           size : 0x20
