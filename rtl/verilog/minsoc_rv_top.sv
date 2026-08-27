@@ -126,6 +126,31 @@ module minsoc_rv_top #(
       .wb_rty_o(wb_s2m_timer_rty)
   );
 
+  //
+  // GPIO Regblock
+  //
+  gpio_regblock gpio_regblock_i (
+    .wb_clk_i(wb_clk_i),
+    .wb_rst_i(wb_rst_i),
+    .wb_cyc_i(wb_m2s_gpio_cyc),
+    .wb_stb_i(wb_m2s_gpio_stb),
+    .wb_adr_i(wb_m2s_gpio_adr),
+    .wb_we_i(wb_m2s_gpio_we),
+    .wb_dat_i(wb_m2s_gpio_dat),
+    .wb_dat_o(wb_s2m_gpio_dat),
+    .wb_ack_o(wb_s2m_gpio_ack),
+    
+    .oe_wr(),
+    .oe_rd(),
+    .oe(),
+    
+    .dati_rd(),
+    .dati(32'hdead_beef),
+
+    .dato_wr(),
+    .dato()
+  );
+
 
   //
   // Ibex
