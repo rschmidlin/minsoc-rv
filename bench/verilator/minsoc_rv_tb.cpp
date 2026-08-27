@@ -149,46 +149,44 @@ int uart_transmit_step(Vminsoc_rv_top* top, VerilatorTbUtils* tbUtils)
     static uint8_t bitnr = 0;
     uint64_t elapsed = 0;
     static bool byte_sent = false;
-    if (!byte_sent) {
-        switch (state) {
-            case 0: // Set start bit
-                start_timestamp = tbUtils->getTime();
-                top->uart_srx_i = 0;
-                state = 1;
-                break;
-            case 1: // wait for start bit
-                if (tbUtils->getTime() - start_timestamp >= (UART_TX_WAIT))
-                {
-                    bit_timestamp = tbUtils->getTime();
-                    state = 2;
+    switch (state) {
+        case 0: // Set start bit
+            start_timestamp = tbUtils->getTime();
+            top->uart_srx_i = 0;
+            state = 1;
+            break;
+        case 1: // wait for start bit
+            if (tbUtils->getTime() - start_timestamp >= (UART_TX_WAIT))
+            {
+                bit_timestamp = tbUtils->getTime();
+                state = 2;
+            }
+            break;
+        case 2: // Send data bits
+            elapsed = tbUtils->getTime() - bit_timestamp;
+            top->uart_srx_i = (byte >> bitnr) & 1;
+            if (elapsed >= UART_TX_WAIT) {
+                bitnr++;
+                bit_timestamp = tbUtils->getTime();
+                if (bitnr >= 7) {
+                    state = 3;
                 }
-                break;
-            case 2: // Send data bits
-                elapsed = tbUtils->getTime() - bit_timestamp;
-                top->uart_srx_i = (byte >> bitnr) & 1;
-                if (elapsed >= UART_TX_WAIT) {
-                    bitnr++;
-                    bit_timestamp = tbUtils->getTime();
-                    if (bitnr >= 7) {
-                        state = 3;
-                    }
-                }
-                break;
-            case 3: // wait for stop bit to finish
-                elapsed = tbUtils->getTime() - bit_timestamp;
-                top->uart_srx_i = 0;
-                if (elapsed >= UART_TX_WAIT) {
-                    state = 0;
-                    top->uart_srx_i = 1;
-                    byte_sent = true;
-                }
-                break;
-            default:
+            }
+            break;
+        case 3: // wait for stop bit to finish
+            elapsed = tbUtils->getTime() - bit_timestamp;
+            top->uart_srx_i = 0;
+            if (elapsed >= UART_TX_WAIT) {
                 state = 0;
-                break;
-        }
+                top->uart_srx_i = 1;
+                return 1;
+            }
+            break;
+        default:
+            state = 0;
+            break;
     }
-    return -1;
+    return 0;
 }
 
 FILE * instr_file;
@@ -269,7 +267,9 @@ int main(int argc, char **argv, char **env)
         int byte = uart_decoder_step(top, tbUtils);
 
         if (send_character) {
-            uart_transmit_step(top, tbUtils);    
+            if (uart_transmit_step(top, tbUtils)) {
+                send_character = false;
+            }
             if (byte == 'Z' && !tbUtils->getJtagEnable()) {
                 done = true;
             }
