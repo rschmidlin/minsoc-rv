@@ -31,13 +31,16 @@ Burst access is done via the module ibex_wb_host_adapter. It converts Ibex memor
 
 ## Packages
 
-Install fusesoc, edalize and packaging in a virtual environment. 
+Install fusesoc and packaging in a virtual environment. 
 
 ```
+mkdir workspace
+cd workspace
 python -m venv .venv
 source .venv/bin/activate
 pip install fusesoc
 pip install packaging
+git clone https://github.com/rschmidlin/minsoc-rv.git
 ```
 
 Prepare fusesoc
@@ -72,7 +75,13 @@ patch -p1 < ../../patches/riscv-dbg_lowrisc_prim.patch
 
 By calling the following command after compiling sw/firmware, you can see Hello World. on the screen. 
 
-```fusesoc run --target sim --elf_load /home/user/workspace/minsoc-rv/sw/hello/hello.elf```
+```
+cd <path>/workspace
+make -C minsoc-rv/sw/common
+make -C minsoc-rv/sw/hello
+source .venv/bin/activate
+fusesoc run --target sim --elf_load ~/workspace/minsoc-rv/sw/hello/hello.elf
+```
 
 
 # VCD Debugging hints 
