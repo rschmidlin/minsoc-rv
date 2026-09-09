@@ -27,9 +27,9 @@ Burst access is done via the module ibex_wb_host_adapter. It converts Ibex memor
 | Timer                          | `0x2000_1000`                            |
 | External DDR / AXI memory      | `0x8000_0000`                            |
 
-# Installation
+## Installation
 
-## Packages
+### Packages
 
 Install fusesoc and packaging in a virtual environment. 
 
@@ -56,7 +56,7 @@ Install Verilator and riscv compiler
 sudo apt install gcc-riscv64-unknown-elf verilator libelf-dev
 ```
 
-## MinSoC-RV Preparation
+### MinSoC-RV Preparation
 
 After cloning MinSoC-RV, also initialize and update its submodules. 
 
@@ -71,7 +71,7 @@ cd vendor/riscv-dbg
 patch -p1 < ../../patches/riscv-dbg_lowrisc_prim.patch
 ```
 
-# First execution
+## First execution
 
 By calling the following command after compiling sw/firmware, you can see Hello World. on the screen. 
 
@@ -84,7 +84,7 @@ fusesoc run --target sim --elf_load ~/workspace/minsoc-rv/sw/hello/hello.elf
 ```
 
 
-# VCD Debugging hints 
+## VCD Debugging hints 
 Hints on how to debug: trace following signals to keep track of Ibex execution:
 
 | Signal                   | Bedeutung                                                                  | Modulpfad                                                                              |
