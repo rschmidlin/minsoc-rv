@@ -145,7 +145,7 @@ picorv32_wb #(
     .REGS_INIT_ZERO       ( 0 ),
     .MASKED_IRQ           ( 32'h0000_0000 ),
     .LATCHED_IRQ          ( 32'hffff_ffff ),
-    .PROGADDR_RESET       ( 32'h0000_0000 ),
+    .PROGADDR_RESET       ( 32'h0000_0080 ),
     .PROGADDR_IRQ         ( 32'h0000_0010 ),
     .STACKADDR            ( 32'hffff_ffff )
 ) u_picorv32_wb (
