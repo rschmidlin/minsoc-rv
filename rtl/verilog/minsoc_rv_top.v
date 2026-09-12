@@ -26,6 +26,20 @@ wire wb_rst = wb_rst_i;
 
 `include "wb_intercon.vh"
 
+/*
+wire [31:0] wb_m2s_picorv32_adr;
+wire [31:0] wb_m2s_picorv32_dat;
+wire  [3:0] wb_m2s_picorv32_sel;
+wire        wb_m2s_picorv32_we;
+wire        wb_m2s_picorv32_cyc;
+wire        wb_m2s_picorv32_stb;
+wire  [2:0] wb_m2s_picorv32_cti;
+wire  [1:0] wb_m2s_picorv32_bte;
+wire [31:0] wb_s2m_picorv32_dat;
+wire        wb_s2m_picorv32_ack;
+wire        wb_s2m_picorv32_err;
+wire        wb_s2m_picorv32_rty;
+*/
 
 ////////////////////////////////////////////////////////////////////////
 //
