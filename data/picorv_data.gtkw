@@ -1,0 +1,37 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sat Sep 12 10:07:28 2026
+[*]
+[dumpfile] "/home/raul/workspace/build/minsoc-rv_0.1/sim-icarus/testlog.vcd"
+[dumpfile_mtime] "Sat Sep 12 09:55:35 2026"
+[dumpfile_size] 11920
+[savefile] "/home/raul/workspace/minsoc-rv/data/picorv_data.gtkw"
+[timestart] 0
+[size] 1920 985
+[pos] -27 -24
+*-17.062685 750000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] minsoc_rv_tb.
+[treeopen] minsoc_rv_tb.dut.
+[treeopen] minsoc_rv_tb.dut.u_picorv32_wb.
+[sst_width] 297
+[signals_width] 234
+[sst_expanded] 1
+[sst_vpaned_height] 291
+@28
+minsoc_rv_tb.dut.u_picorv32_wb.picorv32_core.resetn
+minsoc_rv_tb.dut.u_picorv32_wb.picorv32_core.clk
+@22
+minsoc_rv_tb.dut.u_picorv32_wb.picorv32_core.reg_pc[31:0]
+minsoc_rv_tb.dut.u_picorv32_wb.picorv32_core.reg_op1[31:0]
+minsoc_rv_tb.dut.u_picorv32_wb.picorv32_core.reg_op2[31:0]
+minsoc_rv_tb.dut.u_picorv32_wb.wbm_adr_o[31:0]
+@28
+minsoc_rv_tb.dut.u_picorv32_wb.wbm_stb_o
+minsoc_rv_tb.dut.u_picorv32_wb.wbm_cyc_o
+@22
+minsoc_rv_tb.dut.u_picorv32_wb.wbm_dat_i[31:0]
+minsoc_rv_tb.dut.u_picorv32_wb.wbm_dat_o[31:0]
+@28
+minsoc_rv_tb.dut.u_picorv32_wb.wbm_ack_i
+[pattern_trace] 1
+[pattern_trace] 0
