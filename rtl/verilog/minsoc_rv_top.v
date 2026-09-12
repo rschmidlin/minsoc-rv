@@ -39,6 +39,32 @@ wire [31:0] wb_s2m_picorv32_dat;
 wire        wb_s2m_picorv32_ack;
 wire        wb_s2m_picorv32_err;
 wire        wb_s2m_picorv32_rty;
+
+wire [31:0] wb_m2s_mem_adr;
+wire [31:0] wb_m2s_mem_dat;
+wire  [3:0] wb_m2s_mem_sel;
+wire        wb_m2s_mem_we;
+wire        wb_m2s_mem_cyc;
+wire        wb_m2s_mem_stb;
+wire  [2:0] wb_m2s_mem_cti;
+wire  [1:0] wb_m2s_mem_bte;
+wire [31:0] wb_s2m_mem_dat;
+wire        wb_s2m_mem_ack;
+wire        wb_s2m_mem_err;
+wire        wb_s2m_mem_rty;
+
+wire [31:0] wb_m2s_uart_adr;
+wire [31:0] wb_m2s_uart_dat;
+wire  [3:0] wb_m2s_uart_sel;
+wire        wb_m2s_uart_we;
+wire        wb_m2s_uart_cyc;
+wire        wb_m2s_uart_stb;
+wire  [2:0] wb_m2s_uart_cti;
+wire  [1:0] wb_m2s_uart_bte;
+wire [31:0] wb_s2m_uart_dat;
+wire        wb_s2m_uart_ack;
+wire        wb_s2m_uart_err;
+wire        wb_s2m_uart_rty;
 */
 
 ////////////////////////////////////////////////////////////////////////
