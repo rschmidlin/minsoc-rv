@@ -1,52 +1,22 @@
-Install fusesoc, edalize and packaging in a virtual environment. 
+# MinSoC-RV - Minimal System-on-Chip RISC-V - shortest path between a CPU and a peripheral
 
-```
-python -m venv .venv
-source .venv/bin/activate
-pip install fusesoc
-pip install edalize
-pip install packaging
-```
+MinSoC-RV follows the path of OpenCores' MinSoC by offering a minimal system-on-chip. This time the CPU implements the RISC-V ISA. MinSoC-RV focuses on readability and on establishing a minimum set of modules that still allows you to get started easily with your own system-on-chip, peripheral or accelerator. Only memory, a UART and a timer peripheral are integrated alongside a working debug interface. In addition to the system-on-chip, the project offers a simple simulation environment to execute example applications while exercising the hardware design. This way, the system remains small and manageable, so that a single person can explore and understand it fully.
 
-Prepare fusesoc
+![Block diagram](doc/SoC.png)
 
-```
-fusesoc library add fusesoc-cores https://github.com/fusesoc/fusesoc-cores
-fusesoc library add elf-loader https://github.com/fusesoc/elf-loader.git
-fusesoc library add minsoc-rv
-```
+MinSoC-RV currently runs on the Boolean board and has also run on the Nexys A7 before. Easy FPGA integration has not yet been addressed.
 
-Install Verilator and riscv compiler
-```
-sudo apt install gcc-riscv64-unknown-elf verilator
-```
+The extensibility of MinSoC-RV is now powered by FuseSoC, which allows the integration of versioned IP cores and provides a standard way of simulating, synthesizing and linting the design. MinSoC-RV uses the wb_intercon core to generate its interconnect, allowing for flexible extension and easy definition of the memory map.
 
-By calling the following command after compiling sw/firmware, you can see Hello World. on the screen. 
+The selection of the CPU for MinSoC-RV was a lot more challenging than the selection of the OpenRISC CPU for MinSoC. There are multiple RISC-V CPUs today, while back then there was basically only one option. Many open CPUs come with their own ecosystem and require rather complex configuration before you get a runnable system. In order to reach the goal of being understandable, I decided on a SystemVerilog implementation. This way the whole system is readable in a single language.
 
-```fusesoc run --target sim --tool icarus minsoc-rv --elf_load /home/user/workspace/minsoc-rv/sw/uart/firmware.elf --timeout 50000```
+Selecting the interconnect and its protocol matters for the peripherals to be used. It should be generated so that extensibility is easy, unlike the original MinSoC's interconnect, for example. I decided to re-use LibreCores IP cores, because MinSoC already used them, they are intended for re-use and many of them are very mature by now. For this reason the protocol used is Wishbone. Another reason for selecting Wishbone is the readability of data transmission in waveforms, as it is limited to a single defined time span and composed of a limited number of signals. This can come at the cost of performance, but burst transmissions can help. A further advantage of Wishbone's simplicity is that it can lower the barrier to peripheral implementation, because it is based on a simple contract between register block and interconnect.
 
-Alternatively using Verilator
+MinSoC-RV's ambition is to be seriously considered for embedded systems in the MCU range, and for that, fast memory access is key. A cache helps here, as once a line has been fetched, its words are available in a single cycle until the line is invalidated. Burst memory access and cache line fill complement each other very well and are a target of MinSoC-RV. This led to the decision to use Ibex as the CPU, because Ibex offers cache, debugging, readability and low complexity.
 
-```fusesoc run --target sim --tool verilator minsoc-rv --elf_load ./minsoc-rv/sw/uart/firmware.elf --vcd testbench.vcd```
+Burst access is done via the module ibex_wb_host_adapter. It converts Ibex memory accesses into Wishbone transmissions and issues burst accesses when it detects sequential memory accesses. Its implementation decouples request acceptance from the Wishbone transmission generation and response delivery, while dynamically extending an ongoing burst with newly accepted sequential requests. The design rationale, the variants that were evaluated and the failure cases that shaped the final architecture are documented in [doc/adapter-design.md](doc/adapter-design.md).
 
-
-Current development: debugger mimics memory to CPU in order to debug. To do so, Ibex parameter for address to jump to in debug must be set and it must match the slave address of the debug unit in core file for the Wishbone generator
-
-Adaptations to riscv-dbg:
-    - applied 0001-User-lowrisc-instead-of-PULP-primitives.patch to vendor/riscv-dbg
-    - substituted fifo_v3 of dm_csrs.sv by prim_fifo_sync
-
-Next steps:
-    1) [X] Interruptfähigkeit
-    2) [X] Timer
-    3) [X] Set license
-    4) [X] Re-organize base addresses
-    5) [X] Clean-up unused wires and file formatting
-    6) [X] Cache
-    7) [ ] Axi-Adapter
-    8) [ ] Build with Yosys? 
-
-## Planned memory mapping
+## Memory mapping
 
 | Region                         | Address                                  |
 |--------------------------------|------------------------------------------|
@@ -57,126 +27,80 @@ Next steps:
 | Timer                          | `0x2000_1000`                            |
 | External DDR / AXI memory      | `0x8000_0000`                            |
 
+## Installation
 
-## Cache
+### Packages
 
-### Enabled by implementation of B4 Wishbone adapter with bursts
-
-#### Architecture 
-
-Architecture went through several steps reaching b5 or actually wishbone-burst-5. 
-
-b4:
-  weaker abstraction, because WB ACK directly drives FIFO reading.
-  But the timing relation is neat: ACK means advance burst and fetch next candidate.
-
-b5:
-  stronger abstraction, because WB FSM normally reasons only about slot0/slot1.
-  But the extreme no-bubble burst case reintroduces a carefully gated dependency on FIFO fallthrough.
-
-| Variant                 | Main idea                                         | Strength                    | Weakness                        | Branch            | 
-| ----------------------- | ------------------------------------------------- | --------------------------- | ------------------------------- |-------------------|
-| Direct FSM              | no real queue, state-driven translation           | small                       | fragile around redirects/bursts | wishbone-burst    |
-| Window/counter FSM      | accepted/transferred window tracking              | efficient                   | hard invariants                 | wishbone-burst-b2_working |
-| FIFO with Ibex-side FSM | FSM accepts from Ibex, then writes FIFO           | controlled, easier to stage | two control layers              | wishbone-burst-b3 |
-| FIFO directly on Ibex   | `req && gnt` pushes FIFO                          | clean OBI invariant         | WB side needs lookahead         | wishbone-burst-b4 |
-| FIFO + preload buffer   | direct FIFO plus explicit `slot0/slot1` lookahead | cleanest separation         | slightly more local buffering   | wishbone-burst-b5 |
-
-| Variant                 | Performance               | Stability | Determinism                    | Release suitability         |
-| ----------------------- | ------------------------- | --------- | ------------------------------ | --------------------------- |
-| Direct FSM              | potentially low latency   | weak      | weak around redirects/bursts   | no                          |
-| Window/counter FSM      | probably fastest/smallest | fragile   | hard invariants                | no                          |
-| FIFO with Ibex-side FSM | decent                    | better    | medium, but two control layers | maybe educational           |
-| FIFO directly on Ibex   | good                      | good      | clean OBI boundary             | good, but lookahead awkward |
-| FIFO + preload buffer   | good to very good         | best      | best                           | yes                         |
-
-
-#### Verification
-
-Parts of the adapter testbench were developed with AI assistance and then reviewed,
-adapted, and extended during debugging of the real SoC-level failures. The final
-tests encode the regression cases that drove the adapter architecture.
-
-Verification steps:
-
-Version 1:
-  waveform inspection
-
-Version 2:
-  instruction trace
-
-Version 3:
-  request/response trace
-
-Version 4:
-  scoreboard
-
-#### Problems leading to testcases
-  - 1) verschlucken von data, weil burst cut because of fifo_req_addr_q != wb_adr @236 ps
-  - 2) attempt to modify to fifo_req_addr != wb_adrr + 4 led to verschlucken von response of address 94 - was already cut with 1
-    Solution: solved by only checking outside of first request
-
-  - 3) @220ps, accepting unrequested accesss to 0x160 from requested 0x15c that should follow with 0x144
-    Solution: remove resp_valid if fifo_empty
-
-  - 4) around 750 ps, on jump from 0x158 to 0x84, lost 0x84 request
-    Solution: cancel request immediately on non-continuous access
-
-  - 5) after conversion to FIFO interface on Ibex - two different scenarios when burst needs to be stopped:
-        - a) next address was not granted but fifo_req_addr is not valid because last fifo_rd_en is way back - C6
-              results in burst being scattered - performance is bad
-        - b) fifo_rd_en is asserted and address is invalid - C7 & C8
-
-    Solution: address has to be evaluated, period. After first acknowledgement, we need to at least negate resp_valid if address check was not possible. 
-
-  - 6) Instruction of address 0x648 was swallowed at 3184 ps with commit 0e93ccca5c159753b8fe737307575d4e8d602efa because of too many fifo_rd_en, one too much at end of burst
-    Solution: avoid fifo_rd_en during FINISH. Question is whether this is always valid. 
-
-  - 7) Testbench is not working properly because of combinatorial FIFO read: FIFO ends up reading more than expected. 
-
-  - 8) Preload buffer burst_addr_valid logic is tweaked by slot2 (0x88) and slot 1 (0x84) on a new range but incremental while adapter is still processing slot 0 (0x15C). Burst is not cancelled. 
-    Problem: prepare checks slot0 & 1 for burst, burst checks slot 2 & 1 after prepare buffer is popped, meaning that there was no check for slot 1 and 2 according to the initial conditions. Since prepare buffer contains addresses, 0x158, 0x15C, 0x84, 0x88, it works if first two and last two are checked but nobody checks steps 0x15C to 0x84.  
-    Solution: Also check for burst_valid in BURST state. 
-
-#### VCD Debugging hints 
-Hints on how to debug: trace following signals to keep track of Ibex execution:
+Install fusesoc and packaging in a virtual environment.
 
 ```
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_id[31:0]
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_if[31:0]
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_c_id[15:0]
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_i[31:0]
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_id[31:0]
-
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_valid_id
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.controller_i.BranchPredictor
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.jump_set
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.jump_set_raw
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.branch_set_raw
-TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.if_stage_i.instr_is_compressed_id_o
+mkdir workspace
+cd workspace
+python -m venv .venv
+source .venv/bin/activate
+pip install fusesoc
+pip install packaging
+git clone https://github.com/rschmidlin/minsoc-rv.git
 ```
 
-instr_rdata_i      raw bus/fetch response
-instr_rdata_id     instruction word visible in ID
-instr_rdata_c_id   compressed halfword visible in ID
-pc_if              IF-stage PC / next frontend position
-pc_id              ID-stage PC
-instr_valid_id     ID instruction is valid
-instr_is_compressed_id_o  why PC advances by 2 instead of 4
-jump_set / branch_set     control-flow decision
+Prepare fusesoc
 
-#### Missing points
+```
+fusesoc library add fusesoc-cores https://github.com/fusesoc/fusesoc-cores
+fusesoc library add elf-loader https://github.com/fusesoc/elf-loader.git
+fusesoc library add minsoc-rv
+```
 
-  - 1) [X] Instead of going to idle and removing cyc immediately, finish WB gracefuly and avoid resp_valid
-  - 2) [X] double-check fifo size because it is never full
-  - 3) [X] fifo_last_beat logic seems not to work, maybe related to point nr. 2
-  - 4) [X] req_len logic is meaningless, maybe remove
-  - 5) [X] test if it works without activated cache
-  - 6) [X] Adapt wb_ibex_device_adapter to work with host burst requests
-  - 7) [X] Check if ib_fsm could be replaced by Ibex directly connected to FIFO req_valid <-> wr_en
-  - 8) [X] Only negate gnt if fifo_full, requires that wr_en is based on both req_valid and gnt
-  - 9) [ ] Rename top_nexyssa7.sv to top_xilinx.sv? 
+Install Verilator and the RISC-V compiler
+
+```
+sudo apt install gcc-riscv64-unknown-elf verilator libelf-dev
+```
+
+### MinSoC-RV Preparation
+
+After cloning MinSoC-RV, also initialize and update its submodules.
+
+```
+cd <path>/workspace/minsoc-rv
+git submodule update --init --recursive
+```
+
+And patch riscv-dbg
+
+```
+cd vendor/riscv-dbg
+patch -p1 < ../../patches/riscv-dbg_lowrisc_prim.patch
+```
+
+## First execution
+
+By calling the following commands after compiling sw/hello, you can see `Hello World.` on the screen.
+
+```
+cd <path>/workspace
+make -C minsoc-rv/sw/common
+make -C minsoc-rv/sw/hello
+source .venv/bin/activate
+fusesoc run --target sim --elf_load <path>/workspace/minsoc-rv/sw/hello/hello.elf
+```
+
+## VCD Debugging hints
+
+Hints on how to debug: trace the following signals to keep track of Ibex execution:
+
+| Signal                   | Meaning                                            | Module path                                                                            |
+|--------------------------|----------------------------------------------------|----------------------------------------------------------------------------------------|
+| pc_if                    | Instruction Fetch (IF) program counter (PC) / next address to be fetched | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_if           |
+| instr_rdata_i            | Data present at the instruction interface          | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_i                       |
+| pc_id                    | Program counter in the instruction decoder         | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_id                               |
+| instr_valid_id           | ID instruction is valid                            | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_valid_id                      |
+| instr_is_compressed_id_o | Instruction is a compressed instruction            | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.if_stage_i.instr_is_compressed_id_o |
+| instr_rdata_c_id         | Compressed instruction present in the ID stage     | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_c_id                    |
+| instr_rdata_id           | Instruction word present in the instruction decoder (ID) | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.instr_rdata_id                |
+| jump_set / branch_set    | Jump instruction valid                             | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.id_stage_i.(jump_set/branch_set)    |
+| pc_set                   | Jump instruction valid                             | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.pc_set                              |
+| branch_target_ex         | Jump target address                                | TOP.minsoc_rv_top.ibex_wb_i.ibex_top_i.u_ibex_core.branch_target_ex                    |
 
 ## Licensing
 
