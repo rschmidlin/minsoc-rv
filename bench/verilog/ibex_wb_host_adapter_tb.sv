@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Self-checking testbench for ibex_wb_host_adapter.
-// Covers all nine corner cases from ibex_wb_host_adapter_testbench_architecture.md.
+// Covers all nine corner cases from ibex_wb_host_adapter_testbench_architecture.md,
+// plus the bus-error (wb_err) scenarios E1-E3.
 //
 // Usage:
 //   fusesoc run --target sim ::ibex_wb_adapter:0.1
@@ -13,8 +14,10 @@ module ibex_wb_host_adapter_tb;
 
   vlog_tb_utils vlog_tb_utils0 ();
 
-  // CLASSICQ state encoding from ibex_wb_host_adapter.v (localparam = 4'b0101).
+  // WB FSM state encodings from ibex_wb_host_adapter.v.
   localparam [3:0] DUT_CLASSICQ = 4'b0101;
+  localparam [3:0] DUT_BURST    = 4'b0110;
+  localparam [3:0] DUT_FINISH   = 4'b0111;
 
   // ---------------------------------------------------------------------------
   // Clock and reset
@@ -104,6 +107,11 @@ module ibex_wb_host_adapter_tb;
   reg        check_beats;         // gate per-beat wb_we/wb_sel/wb_dat_w check
   reg        check_classic_pop;   // gate "no preload-buffer pop on classic ACK" check
 
+  // resp_err as delivered for each response, indexed in grant order.  The
+  // E-series tests assert on this instead of sampling resp_err live, because
+  // resp_err is a one-cycle pulse that rides along with its resp_valid.
+  reg        sb_resp_err [0:255];
+
   // Capture WB write-side signals for write-request checks.
   reg [31:0] cap_wb_dat_w;
   reg [3:0]  cap_wb_sel;
@@ -120,18 +128,28 @@ module ibex_wb_host_adapter_tb;
   // R10: burst-abort protocol assertion.
   // CYC must not deassert directly from a burst beat (CTI=010).
   // The required sequence is: CTI=010 → CYC=1/STB=0/CTI=111 → CYC=0.
+  //
+  // ERR is the one exception.  In Wishbone B4 ERR_I is a cycle-terminating
+  // signal in its own right: the slave has ended the cycle, the remaining beats
+  // of the burst can never be delivered, and the master's correct response is
+  // to negate CYC/STB immediately.  Requiring a graceful-abort cycle there
+  // would mean issuing one more STB phase to a slave that just refused the
+  // transfer, so a CYC drop that answers an ERR is exempt (E2).
   reg        wb_cyc_r;
   reg [2:0]  wb_cti_r;
+  reg        wb_err_r;
 
   always @(posedge clk) begin
     if (rst) begin
       wb_cyc_r <= 1'b0;
       wb_cti_r <= 3'b000;
+      wb_err_r <= 1'b0;
     end else begin
-      if (wb_cyc_r && !wb_cyc && wb_cti_r == 3'b010)
+      if (wb_cyc_r && !wb_cyc && wb_cti_r == 3'b010 && !wb_err_r)
         fail("R10: burst aborted without CYC=1/STB=0/CTI=111 graceful-abort cycle");
       wb_cyc_r <= wb_cyc;
       wb_cti_r <= wb_cti;
+      wb_err_r <= wb_err;
     end
   end
 
@@ -169,6 +187,86 @@ module ibex_wb_host_adapter_tb;
         fifo_full_set_latency <= fifo_wr_en_q ? 1 : 2;
       full_q       <= dut.fifo_full;
       fifo_wr_en_q <= dut.fifo_wr_en;
+    end
+  end
+
+  // ---------------------------------------------------------------------------
+  // Wishbone address trace (E-series)
+  //
+  // wb_cyc_addr[] records the address each Wishbone cycle STARTS with, so a
+  // test can prove that a request terminated by ERR is retired rather than
+  // replayed as the first transfer of the next cycle.  watch_addr_beats counts
+  // every terminated (ACKed or ERRed) beat at watch_addr, which catches a
+  // replay anywhere, including one folded into a later burst.
+  //
+  // Sampling note: both the slave's ACK/ERR and the DUT's wb_adr increment are
+  // registered, so at the posedge where the DUT samples wb_ack/wb_err, wb_adr
+  // is the address of the beat being terminated.  That is the edge used here.
+  reg [31:0] wb_cyc_addr [0:31];
+  integer    wb_cyc_count;
+  reg        wb_stb_r;
+  reg [31:0] watch_addr;
+  integer    watch_addr_beats;
+
+  // Where the last ERR landed: its bus address, the CTI it was driven under
+  // (000 classic, 010 burst beat, 111 end-of-burst/FINISH beat) and the DUT
+  // state that consumed it.  E1/E2/E3 assert on these so each test proves the
+  // error really occurred in the phase it claims to cover.
+  reg [31:0] err_beat_addr;
+  reg [2:0]  err_beat_cti;
+  reg [3:0]  err_beat_state;
+  integer    err_beats_seen;
+
+  always @(posedge clk) begin
+    if (rst) begin
+      wb_stb_r <= 1'b0;
+    end else begin
+      if (wb_cyc && wb_stb && !wb_stb_r) begin
+        if (wb_cyc_count < 32) wb_cyc_addr[wb_cyc_count] = wb_adr;
+        wb_cyc_count = wb_cyc_count + 1;
+      end
+      if (wb_cyc && wb_stb && (wb_ack || wb_err) && (wb_adr === watch_addr))
+        watch_addr_beats = watch_addr_beats + 1;
+      if (wb_cyc && wb_stb && wb_err) begin
+        err_beat_addr  = wb_adr;
+        err_beat_cti   = wb_cti;
+        err_beat_state = dut.wb_state;
+        err_beats_seen = err_beats_seen + 1;
+      end
+      wb_stb_r <= wb_cyc && wb_stb;
+    end
+  end
+
+  // S1: slave-model protocol assertion.
+  //
+  // Wishbone B4 allows exactly one cycle-terminating signal per bus phase, and
+  // ERR ends the cycle outright.  Two things must therefore never be observed:
+  //
+  //   - wb_ack and wb_err asserted together, and
+  //   - any further response after an ERR, until the master negates CYC.
+  //
+  // The second is easy to get wrong in a registered slave model.  The adapter
+  // has registered outputs, so it cannot drop CYC/STB in the same cycle it
+  // observes the response -- STB is still high while the adapter is consuming
+  // the ERR.  A slave that keys only off STB answers that very same bus phase a
+  // second time, with an ACK, immediately after having failed it.
+  //
+  // This guards the model, not the DUT: the adapter is in IDLE by then and
+  // ignores the stray ACK.  It is asserted anyway so the slave cannot silently
+  // drift away from the protocol the DUT is being tested against.
+  reg err_terminated_cyc;
+
+  always @(posedge clk) begin
+    if (rst) begin
+      err_terminated_cyc <= 1'b0;
+    end else begin
+      if (wb_ack && wb_err)
+        fail("S1: slave drove wb_ack and wb_err in the same cycle");
+      if (err_terminated_cyc && (wb_ack || wb_err))
+        fail("S1: slave responded again after ERR had terminated the cycle");
+
+      if (wb_err)           err_terminated_cyc <= 1'b1;
+      else if (!wb_cyc)     err_terminated_cyc <= 1'b0;
     end
   end
 
@@ -224,13 +322,19 @@ module ibex_wb_host_adapter_tb;
         responses_seen = responses_seen + 1;
         if (responses_seen > grants_seen) begin
           fail("resp_valid without matching prior GNT");
-        end else if (!sb_we[sb_rd]) begin
-          if (resp_rdata !== mem_data_for_addr(sb_addr[sb_rd])) begin
-            $display("  addr %08x  expected %08x  got %08x",
-                     sb_addr[sb_rd],
-                     mem_data_for_addr(sb_addr[sb_rd]),
-                     resp_rdata);
-            fail("read response data mismatch");
+        end else begin
+          sb_resp_err[sb_rd] = resp_err;
+          // A response that carries resp_err answers a beat the slave refused
+          // with ERR, so no read data was transferred and resp_rdata is
+          // meaningless.  Only successful reads are data-checked.
+          if (!sb_we[sb_rd] && !resp_err) begin
+            if (resp_rdata !== mem_data_for_addr(sb_addr[sb_rd])) begin
+              $display("  addr %08x  expected %08x  got %08x",
+                       sb_addr[sb_rd],
+                       mem_data_for_addr(sb_addr[sb_rd]),
+                       resp_rdata);
+              fail("read response data mismatch");
+            end
           end
         end
         sb_rd = sb_rd + 1;
@@ -258,33 +362,73 @@ module ibex_wb_host_adapter_tb;
   reg [31:0] slave_adr;
   reg        slave_in_burst;
 
+  // --- Error injection (E-series) ------------------------------------------
+  // slave_resp_idx counts every response the slave has produced since reset,
+  // ACKs and ERRs alike, so a test can name the beat to fail.
+  //   err_beat      : index of the response answered with ERR; -1 disables.
+  //   err_on_finish : answer with ERR whenever the DUT is parked in FINISH,
+  //                   i.e. on the CTI=111 end-of-burst beat.  Use it only with
+  //                   wait states (ack_gap >= 1): the gap guarantees the slave
+  //                   produces no response on the BURST->FINISH edge itself, so
+  //                   the response the DUT consumes in FINISH is this one.
+  integer    slave_resp_idx;
+  integer    err_beat;
+  reg        err_on_finish;
+
+  // Set when this Wishbone cycle has been terminated by ERR, cleared when the
+  // master negates CYC.  ERR ends the cycle in Wishbone B4, so the slave owes
+  // no further response on it -- and must not give one.  Without this the
+  // adapter's registered CYC/STB (still high for the cycle in which it consumes
+  // the ERR) would look like a fresh bus phase and be ACKed, so the same phase
+  // would be answered twice: first ERR, then ACK.  See assertion S1.
+  reg        slave_cyc_terminated;
+
+  wire       slave_err_now = ((err_beat >= 0) && (slave_resp_idx == err_beat))
+                          || (err_on_finish && (dut.wb_state == DUT_FINISH));
+
   always @(posedge clk) begin
     if (rst) begin
       wb_ack         <= 1'b0;
+      wb_err         <= 1'b0;
       wb_dat_r       <= 32'h0;
       slave_adr      <= 32'h0;
       slave_in_burst <= 1'b0;
       ack_countdown  <= 0;
+      slave_resp_idx <= 0;
+      slave_cyc_terminated <= 1'b0;
     end else begin
       wb_ack <= 1'b0;
+      wb_err <= 1'b0;
 
       if (!wb_cyc) begin
-        slave_in_burst <= 1'b0;
-        slave_adr      <= 32'h0;
-        ack_countdown  <= 0;
-      end else if (wb_stb && ack_enable && (ack_beats != 0)) begin
+        slave_in_burst       <= 1'b0;
+        slave_adr            <= 32'h0;
+        ack_countdown        <= 0;
+        slave_cyc_terminated <= 1'b0;
+      end else if (wb_stb && ack_enable && !slave_cyc_terminated && (ack_beats != 0)) begin
         if (ack_countdown == 0) begin
-          if (!slave_in_burst) begin
+          if (slave_err_now) begin
+            // ERR terminates the cycle: no data is transferred and the burst,
+            // if any, is over, so the burst address tracker is dropped.  The
+            // data bus is driven with a recognisable poison value that must
+            // never reach the Ibex side as a valid response.
+            wb_err               <= 1'b1;
+            wb_dat_r             <= 32'hdead_e770;
+            slave_in_burst       <= 1'b0;
+            slave_cyc_terminated <= 1'b1;
+          end else if (!slave_in_burst) begin
             wb_dat_r       <= mem_data_for_addr(wb_adr);
             slave_adr      <= wb_adr;
             slave_in_burst <= (wb_cti == 3'b010);
+            wb_ack         <= 1'b1;
           end else begin
             wb_dat_r  <= mem_data_for_addr(slave_adr + 32'd4);
             slave_adr <= slave_adr + 32'd4;
             if (wb_cti == 3'b111) slave_in_burst <= 1'b0;
+            wb_ack    <= 1'b1;
           end
-          wb_ack        <= 1'b1;
-          ack_countdown <= ack_gap;
+          slave_resp_idx <= slave_resp_idx + 1;
+          ack_countdown  <= ack_gap;
           if (ack_beats > 0) ack_beats = ack_beats - 1;
         end else begin
           ack_countdown <= ack_countdown - 1;
@@ -316,6 +460,23 @@ module ibex_wb_host_adapter_tb;
 
   task stop_ack;
     ack_enable = 1'b0;
+  endtask
+
+  // Answer the (n+1)-th response from now with ERR: n normal responses first,
+  // then the error.  n = 0 fails the very next response the slave produces.
+  task set_err_after_beats(input integer n);
+    err_beat = slave_resp_idx + n;
+  endtask
+
+  // Fail whichever beat the DUT services from its FINISH state (CTI=111).
+  // Requires wait states; see the err_on_finish comment above.
+  task set_err_on_finish;
+    err_on_finish = 1'b1;
+  endtask
+
+  task clear_err_injection;
+    err_beat      = -1;
+    err_on_finish = 1'b0;
   endtask
 
   // ---------------------------------------------------------------------------
@@ -467,6 +628,15 @@ module ibex_wb_host_adapter_tb;
     check_classic_pop = 1'b0;
     grants_seen   = 0;
     responses_seen = 0;
+    err_beat         = -1;
+    err_on_finish    = 1'b0;
+    wb_cyc_count     = 0;
+    watch_addr       = 32'hffff_ffff;   // sentinel: matches no test address
+    watch_addr_beats = 0;
+    err_beat_addr    = 32'h0;
+    err_beat_cti     = 3'b000;
+    err_beat_state   = 4'h0;
+    err_beats_seen   = 0;
     rst = 1'b1;
     repeat (5) @(posedge clk);
     rst = 1'b0;
@@ -496,6 +666,30 @@ module ibex_wb_host_adapter_tb;
       if (dut.wb_state == DUT_CLASSICQ) disable wait_classicq;
     end
     fail("wait_classicq: classic transfer never started");
+  endtask
+
+  // Wait until the DUT's WB FSM reaches a given state.
+  task wait_wb_state(input [3:0] st, input integer max_cycles);
+    integer i;
+    for (i = 0; i < max_cycles; i = i + 1) begin
+      @(posedge clk);
+      if (dut.wb_state == st) disable wait_wb_state;
+    end
+    fail("wait_wb_state: DUT never reached the expected WB state");
+  endtask
+
+  // Check the resp_err flag recorded for the idx-th response (grant order).
+  task expect_resp_err(input integer idx, input expected, input [1023:0] msg);
+    begin
+      if (idx >= responses_seen) begin
+        $display("  response %0d never arrived (only %0d seen)", idx, responses_seen);
+        fail(msg);
+      end else if (sb_resp_err[idx] !== expected) begin
+        $display("  response %0d addr %08x: resp_err=%b expected %b",
+                 idx, sb_addr[idx], sb_resp_err[idx], expected);
+        fail(msg);
+      end
+    end
   endtask
 
   task expect_counts(input integer g, input integer r);
@@ -1334,11 +1528,342 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+
+  // ===========================================================================
+  // E-series: Wishbone bus errors (wb_err)
+  //
+  // ibex_wb_host_adapter forwards wb_err to the Ibex memory interface as
+  // resp_err.  Because an ERR terminates the Wishbone cycle, it also ends any
+  // burst in progress, which raises two obligations the E-series pins down:
+  //
+  //   (a) Continuation.  Every request that was already GRANTED before the
+  //       error still owes exactly one response (R5 / grant-response count).
+  //       Killing the bus cycle must not drop the requests queued behind the
+  //       failing one -- they have to be serviced by a fresh Wishbone cycle.
+  //
+  //   (b) No replay.  The request that errored is retired by its (errored)
+  //       response.  It must NOT be left in the preload buffer to become the
+  //       first transfer of the next Wishbone cycle, which would both re-drive
+  //       a known-bad address and shift every later response off by one.
+  //
+  // Both are checked structurally: wb_cyc_addr[] pins the start address of each
+  // Wishbone cycle, and watch_addr_beats counts every terminated beat at the
+  // errored address (which must stay 1).  err_beat_cti / err_beat_state make
+  // each test prove the error landed in the FSM phase it means to cover.
+  // ===========================================================================
+
+  // E1: ERR on a CLASSIC transfer.
+  //
+  // 0x300 is driven down the CLASSIC path (as in C13: the WB side is stalled so
+  // no second entry is visible at PREPARE1 and no burst opens), then 0x304 and
+  // 0x308 are granted while that classic transfer is still stalled -- they are
+  // owed responses no matter how 0x300 ends.  The bus is then released with an
+  // ERR on the very first slave response, i.e. on the classic 0x300 beat.
+  task test_classic_err_forwarded_and_continues;
+    begin
+      start_test("E1: ERR on classic transfer - forwarded, queued requests continue, no replay");
+      stop_ack();
+
+      issue_read(32'h0000_0300);
+      wait_classicq(40);
+      check(dut.wb_state == DUT_CLASSICQ, "E1: expected a classic transfer for 0x300");
+
+      // Park two more requests behind the stalled classic transfer.
+      issue_read(32'h0000_0304);
+      issue_read(32'h0000_0308);
+      check(dut.wb_state == DUT_CLASSICQ,
+            "E1: must still be in the classic transfer after parking 0x304/0x308");
+      check(grants_seen == 3, "E1: all three requests must be granted");
+      check(responses_seen == 0,
+            "E1: no response before the stalled classic transfer terminates");
+
+      watch_addr = 32'h0000_0300;
+      set_err_after_beats(0);   // fail the next (i.e. the classic) response
+      set_ack_continuous();
+
+      wait_responses(3, 120);
+      expect_counts(3, 3);
+
+      // The error must be visible on the Ibex side, and only there.
+      check(err_beats_seen == 1, "E1: exactly one ERR must have been taken");
+      check(err_beat_state == DUT_CLASSICQ, "E1: the ERR must have been consumed in CLASSICQ");
+      check(err_beat_cti == 3'b000, "E1: a classic transfer must drive CTI=000");
+      check(err_beat_addr == 32'h0000_0300, "E1: the ERR must belong to the 0x300 beat");
+
+      expect_resp_err(0, 1'b1, "E1: wb_err on the classic beat must be forwarded as resp_err");
+      expect_resp_err(1, 1'b0, "E1: 0x304 must respond without error after the failed 0x300");
+      expect_resp_err(2, 1'b0, "E1: 0x308 must respond without error after the failed 0x300");
+
+      check(sb_addr[0] == 32'h0000_0300, "E1: first grant 0x300");
+      check(sb_addr[1] == 32'h0000_0304, "E1: second grant 0x304");
+      check(sb_addr[2] == 32'h0000_0308, "E1: third grant 0x308");
+
+      // (b) no replay, (a) continuation.
+      check(watch_addr_beats == 1,
+            "E1: the errored request 0x300 was driven on the bus more than once");
+      check(wb_cyc_count >= 2,
+            "E1: a new Wishbone cycle must service the requests queued behind the error");
+      check(wb_cyc_addr[1] == 32'h0000_0304,
+            "E1: the cycle after the error must start at 0x304, not replay the errored 0x300");
+
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0, "E1: phantom resp_valid after the queue drains");
+      check(!wb_cyc, "E1: WB must be idle after the queue drains");
+      expect_counts(3, 3);
+    end
+  endtask
+
+  // E2: ERR on a burst beat (CTI=010), mid-burst.
+  //
+  // Six sequential reads 0x800..0x814 are piled up while the WB side is
+  // stalled, so releasing the bus opens one long burst.  The second slave
+  // response is an ERR, hitting the 0x804 beat while 0x808..0x814 are still
+  // queued behind it.  The burst has to stop there (the remaining beats can
+  // never be delivered on that cycle), but the four requests behind the failing
+  // one are already granted and must still be serviced -- by a fresh Wishbone
+  // cycle that starts at 0x808, NOT by replaying 0x804.
+  //
+  // The R10 monitor above allows the CYC drop here because it answers an ERR.
+  task test_burst_err_aborts_and_continues;
+    integer granted;
+    integer waited;
+    begin
+      start_test("E2: ERR mid-burst - burst stops, granted requests continue, no replay");
+      stop_ack();
+
+      granted = 0;
+      waited  = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (granted < 6 && waited < 60) begin
+        req_addr = 32'h0000_0800 + granted * 4;
+        @(posedge clk);
+        if (gnt) granted = granted + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      if (granted < 6) fail("E2: not all six requests were granted");
+
+      // One good beat (0x800), then ERR on the next (0x804).
+      watch_addr = 32'h0000_0804;
+      set_err_after_beats(1);
+      set_ack_continuous();
+
+      // (a) continuation: every granted request still owes one response.
+      wait_responses(6, 200);
+      expect_counts(6, 6);
+
+      check(err_beats_seen == 1, "E2: exactly one ERR must have been taken");
+      check(err_beat_state == DUT_BURST, "E2: the ERR must have been consumed in BURST");
+      check(err_beat_cti == 3'b010, "E2: the errored beat must be a burst beat (CTI=010)");
+      check(err_beat_addr == 32'h0000_0804, "E2: the ERR must belong to the 0x804 beat");
+
+      expect_resp_err(0, 1'b0, "E2: the first burst beat must respond without error");
+      expect_resp_err(1, 1'b1, "E2: wb_err on a burst beat must be forwarded as resp_err");
+      expect_resp_err(2, 1'b0, "E2: 0x808 must respond without error after the aborted burst");
+      expect_resp_err(3, 1'b0, "E2: 0x80c must respond without error after the aborted burst");
+      expect_resp_err(4, 1'b0, "E2: 0x810 must respond without error after the aborted burst");
+      expect_resp_err(5, 1'b0, "E2: 0x814 must respond without error after the aborted burst");
+
+      // (b) no replay.
+      check(watch_addr_beats == 1,
+            "E2: the errored beat 0x804 was driven on the bus more than once");
+      check(wb_cyc_count >= 2,
+            "E2: a new Wishbone cycle must service the requests queued behind the error");
+      check(wb_cyc_addr[1] == 32'h0000_0808,
+            "E2: the cycle after the error must start at 0x808, not replay the errored 0x804");
+
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0, "E2: phantom resp_valid after the run drains");
+      check(!wb_cyc, "E2: WB cycle must close after the run drains");
+      expect_counts(6, 6);
+    end
+  endtask
+
+  // E3: ERR on the end-of-burst beat serviced from FINISH (CTI=111).
+  //
+  // FINISH is the distinct case: the burst has already been terminated by the
+  // adapter itself (CTI=111 is driven, the preload buffer has been popped) and
+  // the FSM is only waiting for the last beat to be acknowledged.  An ERR
+  // arriving there must still be forwarded as resp_err for that last beat, and
+  // the request that follows the burst must still be serviced.
+  //
+  // Layout: 0x900/0x904/0x908 sequential, then non-sequential 0x9c0 (the same
+  // shape as P6).  The 0x9c0 entry is what makes the adapter close the burst.
+  // Note WHERE it closes: the BURST state looks ahead as far as slot2, so on
+  // the very first ACK it already sees slot0=0x904, slot1=0x908, slot2=0x9c0
+  // and burst_valid_q (slot2 == slot1 + 4) is false.  The burst is therefore
+  // terminated two beats ahead of the break and 0x904 -- not 0x908 -- is the
+  // beat serviced from FINISH with CTI=111.
+  //
+  // That leaves BOTH 0x908 and 0x9c0 already granted behind the failing beat,
+  // so this test covers continuation across two further transfers as well as
+  // the FINISH error itself.  err_beat_cti / err_beat_state are the checks that
+  // prove the error really landed in FINISH; the address checks additionally
+  // pin the burst length, so a change in the lookahead shows up here.
+  //
+  // One wait state is required for err_on_finish to be unambiguous: it makes
+  // the slave idle on the BURST->FINISH edge, so the response the DUT consumes
+  // while parked in FINISH is the one injected here.
+  task test_burst_finish_err_and_continues;
+    integer granted;
+    integer waited;
+    reg [31:0] addrs [0:3];
+    begin
+      start_test("E3: ERR on the FINISH beat (CTI=111) - forwarded, trailing request continues");
+      stop_ack();
+
+      addrs[0] = 32'h0000_0900;
+      addrs[1] = 32'h0000_0904;
+      addrs[2] = 32'h0000_0908;   // last sequential beat -> serviced from FINISH
+      addrs[3] = 32'h0000_09c0;   // non-sequential: ends the burst, must survive
+
+      granted = 0;
+      waited  = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (granted < 4 && waited < 60) begin
+        req_addr = addrs[granted];
+        @(posedge clk);
+        if (gnt) granted = granted + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      if (granted < 4) fail("E3: not all four requests were granted");
+
+      watch_addr = 32'h0000_0904;   // the beat FINISH services (see above)
+      set_err_on_finish();
+      set_ack_waitstates(1);
+
+      wait_responses(4, 250);
+      expect_counts(4, 4);
+
+      check(err_beats_seen == 1, "E3: exactly one ERR must have been taken");
+      check(err_beat_state == DUT_FINISH, "E3: the ERR must have been consumed in FINISH");
+      check(err_beat_cti == 3'b111, "E3: the FINISH beat must drive CTI=111 (end-of-burst)");
+      check(err_beat_addr == 32'h0000_0904, "E3: the ERR must belong to the 0x904 (FINISH) beat");
+
+      expect_resp_err(0, 1'b0, "E3: the first burst beat must respond without error");
+      expect_resp_err(1, 1'b1, "E3: wb_err in FINISH must be forwarded as resp_err");
+      expect_resp_err(2, 1'b0, "E3: the trailing 0x908 must respond without error");
+      expect_resp_err(3, 1'b0, "E3: the trailing 0x9c0 must respond without error");
+
+      check(sb_addr[2] == 32'h0000_0908, "E3: third grant 0x908");
+      check(sb_addr[3] == 32'h0000_09c0, "E3: fourth grant 0x9c0");
+
+      // (b) no replay, (a) continuation.
+      check(watch_addr_beats == 1,
+            "E3: the errored FINISH beat 0x904 was driven on the bus more than once");
+      check(wb_cyc_count >= 2,
+            "E3: a new Wishbone cycle must service the requests queued behind the error");
+      check(wb_cyc_addr[1] == 32'h0000_0908,
+            "E3: the cycle after the FINISH error must start at 0x908, not replay 0x904");
+
+      clear_err_injection();
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0, "E3: phantom resp_valid after the FINISH error");
+      check(!wb_cyc, "E3: WB cycle must close after the FINISH error");
+      expect_counts(4, 4);
+    end
+  endtask
+
+  // E4: ERR on the FIRST beat of a burst, before any beat has been acknowledged.
+  //
+  // E2 fails the second beat, so by then the burst is in steady state: an ACK
+  // has already been taken and the per-beat pop bookkeeping has run once.  The
+  // first beat is a different path on both counts:
+  //
+  //   - its preload-buffer pop was issued by PREPARE1, not by a preceding ACK,
+  //     so no pop-on-ack has happened yet inside BURST; and
+  //   - the RTL uses resp_valid as the "we acked previously and consequently
+  //     popped the buffer" flag (ibex_wb_host_adapter.v, BURST/wb_ack branch),
+  //     and resp_valid is 0 only here.
+  //
+  // So this is the one case where a burst dies with no successful beat at all.
+  // The failure it isolates is an off-by-one in what the error retires: the
+  // errored response must belong to the burst's OWN first request (0xa00), and
+  // the next Wishbone cycle must resume at the second one (0xa04).  Retiring
+  // one request too many would restart at 0xa08 and silently drop 0xa04;
+  // retiring one too few would replay 0xa00.  Both show up here, the first as a
+  // wrong cycle-start address plus a response-count shortfall, the second on
+  // watch_addr_beats.
+  //
+  // This is the burst-error analogue of C11: the first beat is special, so it
+  // gets its own scenario rather than being assumed to behave like the rest.
+  task test_burst_first_beat_err;
+    integer granted;
+    integer waited;
+    begin
+      start_test("E4: ERR on the first burst beat - nothing acked yet, queue must still continue");
+      stop_ack();
+
+      granted = 0;
+      waited  = 0;
+      @(negedge clk);
+      req_valid = 1'b1;
+      req_we    = 1'b0;
+      req_be    = 4'hf;
+      req_wdata = 32'h0;
+      while (granted < 6 && waited < 60) begin
+        req_addr = 32'h0000_0a00 + granted * 4;
+        @(posedge clk);
+        if (gnt) granted = granted + 1;
+        waited = waited + 1;
+        @(negedge clk);
+      end
+      req_valid = 1'b0;
+      if (granted < 6) fail("E4: not all six requests were granted");
+
+      // Fail the very first response the slave produces: the burst's opening
+      // beat, with resp_valid still 0 and no pop-on-ack yet performed.
+      watch_addr = 32'h0000_0a00;
+      set_err_after_beats(0);
+      set_ack_continuous();
+
+      wait_responses(6, 200);
+      expect_counts(6, 6);
+
+      check(err_beats_seen == 1, "E4: exactly one ERR must have been taken");
+      check(err_beat_state == DUT_BURST, "E4: the ERR must have been consumed in BURST");
+      check(err_beat_cti == 3'b010, "E4: the errored beat must be a burst beat (CTI=010)");
+      check(err_beat_addr == 32'h0000_0a00, "E4: the ERR must belong to the opening 0xa00 beat");
+
+      expect_resp_err(0, 1'b1, "E4: wb_err on the opening burst beat must be forwarded as resp_err");
+      expect_resp_err(1, 1'b0, "E4: 0xa04 must respond without error after the aborted burst");
+      expect_resp_err(2, 1'b0, "E4: 0xa08 must respond without error after the aborted burst");
+      expect_resp_err(3, 1'b0, "E4: 0xa0c must respond without error after the aborted burst");
+      expect_resp_err(4, 1'b0, "E4: 0xa10 must respond without error after the aborted burst");
+      expect_resp_err(5, 1'b0, "E4: 0xa14 must respond without error after the aborted burst");
+
+      check(sb_addr[1] == 32'h0000_0a04, "E4: second grant 0xa04");
+      check(watch_addr_beats == 1,
+            "E4: the errored opening beat 0xa00 was driven on the bus more than once");
+      check(wb_cyc_count >= 2,
+            "E4: a new Wishbone cycle must service the requests queued behind the error");
+      check(wb_cyc_addr[1] == 32'h0000_0a04,
+            "E4: the cycle after the error must resume at 0xa04 - not replay 0xa00, not skip to 0xa08");
+
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0, "E4: phantom resp_valid after the run drains");
+      check(!wb_cyc, "E4: WB cycle must close after the run drains");
+      expect_counts(6, 6);
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
   // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 L1 GAP P6 C17 C18
+  //       E1 E2 E3 E4 (Wishbone bus errors)
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -1370,6 +1895,10 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "C17")  test_fifo_empty_midburst();
     if (testcase_filter == "" || testcase_filter == "C18")  test_midburst_break_with_sequential_after();
     if (testcase_filter == "" || testcase_filter == "P6")   test_finish_no_extra_fifo_rd_en();
+    if (testcase_filter == "" || testcase_filter == "E1")   test_classic_err_forwarded_and_continues();
+    if (testcase_filter == "" || testcase_filter == "E2")   test_burst_err_aborts_and_continues();
+    if (testcase_filter == "" || testcase_filter == "E3")   test_burst_finish_err_and_continues();
+    if (testcase_filter == "" || testcase_filter == "E4")   test_burst_first_beat_err();
 
     if (errors == 0)
       $display("\nPASS: all ibex_wb_host_adapter tests passed");
