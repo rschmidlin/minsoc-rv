@@ -588,9 +588,11 @@ Each scenario should describe the behavior being tested, not the internal implem
 ## 8. Required Corner Cases
 
 This list focuses only on `ibex_wb_host_adapter`. Cases C9–C12 are named regressions
-that correspond directly to the four bugs recorded in README.md § Cache. Cases E1–E4
+that correspond directly to the four bugs recorded in README.md § Cache. Cases E1–E5
 cover Wishbone bus errors (R11–R13): one per Wishbone phase in which an error can land,
-plus E4 for the first beat of a burst, which is a distinct path from the rest.
+E4 for the first beat of a burst, and E5 for an error taken while the preload buffer is
+popped and refilled on the same edge. See *How the errored request gets retired* at the
+end of this section for what separates them.
 
 ### C1. Classic single read
 
@@ -948,6 +950,53 @@ FINISH is reachable only from the BURST wb_ack branch
 ```
 
 E4's condition (`resp_valid == 0`, first beat) and E3's (CTI=111, FINISH) are therefore mutually exclusive by construction. The minimal burst runs beat 1 as CTI=010 in BURST and beat 2 as CTI=111 in FINISH.
+
+---
+
+### E5. Bus error under back pressure, on a pop-and-refill edge
+
+E2 and E4 error a burst that is draining a queue nobody is refilling. E5 keeps the Ibex side pushing for the whole test, so the FIFO stays full, the burst runs at one beat per cycle, and on every beat the preload buffer pops `slot0` and reads the FIFO on the *same* edge — the `fifo_forward` path, in which `fifo_dout` is consumed as the third-word lookahead (`burst_valid_qq`).
+
+Setup:
+
+```text
+drive sequential requests continuously for the whole test (FIFO stays full)
+let the FIFO saturate, then release continuous ACKs with ERR on beat 3
+```
+
+Checks, beyond the usual R11–R13 set:
+
+```text
+gnt was actually refused at some point      (back pressure really occurred)
+fifo_empty == 0 at the error                (the refill path is the point)
+fifo_forward == 1 at the error              (the scenario was reached)
+slot0 still holds the erroring address at the error edge
+preload_buffer_pop == 1 at the error edge   (the retiring pop is in flight)
+```
+
+**What this settles.** At the error edge `slot0` still holds the address that is erroring on the bus, so retiring it *requires* a preload-buffer pop — and the error path never issues one. It works because the pop was already scheduled by the **previous beat's ACK** and lands on this very edge. The `preload_buffer_pop <= 1'b0` at the top of the BURST block cannot cancel it: the buffer sampled the pop during the cycle that is now ending.
+
+Correct behaviour here therefore rests on a cross-beat timing relationship rather than on anything the error handling does, which is the kind of dependency that breaks silently. Suppressing that in-flight pop on error (`slot0_pop & ~wb_err`) shifts every subsequent response one request out of order — every later read returns its neighbour's data.
+
+The white-box checks are what stop the scenario decaying: if the stimulus stops reaching the `fifo_forward` path, the test fails rather than quietly becoming a second copy of E2.
+
+---
+
+### How the errored request gets retired
+
+The five error scenarios are not five dressings of one case. Measured at the error edge, each lands the adapter in a different preload-buffer state, and there are **two distinct retirement mechanisms**:
+
+| case | `fifo_forward` | `pop` in flight | `slot2_valid` | FIFO | `slot0` vs bus address | retired |
+|---|---|---|---|---|---|---|
+| E1 classic | 0 | 0 | 0 | filling | stale, invalid | before the error |
+| E2 burst, steady state | 0 | **1** | 1 | loaded | **same** | by the in-flight pop |
+| E3 FINISH | 0 | 0 | 0 | empty | already advanced | before the error |
+| E4 burst, first beat | 0 | 0 | 1 | loaded | already advanced | before the error |
+| E5 back pressure | **1** | **1** | 0 | **full** | **same** | by the in-flight pop |
+
+Where `slot0` has already advanced past the bus address (E1, E3, E4), the request was retired by an earlier pop and the error path has nothing left to do. Where `slot0` still holds it (E2, E5), retirement depends on the in-flight pop landing on the error edge.
+
+E5 is the only case in which `fifo_forward` is active at the error — the only one where `fifo_dout` is part of the live burst-decision window at the moment the cycle dies. That is why it exists despite E2 covering the same retirement mechanism.
 
 ---
 

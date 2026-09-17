@@ -217,6 +217,24 @@ module ibex_wb_host_adapter_tb;
   reg [3:0]  err_beat_state;
   integer    err_beats_seen;
 
+  // Preload-buffer context at the moment the error is taken (E5).  The request
+  // the errored beat is serving is retired by a pop that was scheduled by the
+  // PREVIOUS beat's ACK and lands on this very edge -- the error path never
+  // issues one of its own.  Capturing the pop and the fifo_forward condition
+  // lets E5 assert it actually exercised that path instead of a quieter one.
+  reg        err_beat_pop;         // preload_buffer_pop in flight at the error
+  reg        err_beat_fwd;         // fifo_forward: pop + FIFO read on the same edge
+  reg        err_beat_fifo_empty;
+  reg [31:0] err_beat_slot0;
+
+  // Back pressure actually observed: cycles in which a request was offered and
+  // refused because the FIFO was full.
+  integer    gnt_blocked_cycles;
+
+  always @(posedge clk) begin
+    if (!rst && req_valid && !gnt) gnt_blocked_cycles = gnt_blocked_cycles + 1;
+  end
+
   always @(posedge clk) begin
     if (rst) begin
       wb_stb_r <= 1'b0;
@@ -228,10 +246,14 @@ module ibex_wb_host_adapter_tb;
       if (wb_cyc && wb_stb && (wb_ack || wb_err) && (wb_adr === watch_addr))
         watch_addr_beats = watch_addr_beats + 1;
       if (wb_cyc && wb_stb && wb_err) begin
-        err_beat_addr  = wb_adr;
-        err_beat_cti   = wb_cti;
-        err_beat_state = dut.wb_state;
-        err_beats_seen = err_beats_seen + 1;
+        err_beat_addr       = wb_adr;
+        err_beat_cti        = wb_cti;
+        err_beat_state      = dut.wb_state;
+        err_beat_pop        = dut.preload_buffer_pop;
+        err_beat_fwd        = dut.fifo_forward;
+        err_beat_fifo_empty = dut.fifo_empty;
+        err_beat_slot0      = dut.slot0_addr;
+        err_beats_seen      = err_beats_seen + 1;
       end
       wb_stb_r <= wb_cyc && wb_stb;
     end
@@ -637,6 +659,11 @@ module ibex_wb_host_adapter_tb;
     err_beat_cti     = 3'b000;
     err_beat_state   = 4'h0;
     err_beats_seen   = 0;
+    err_beat_pop        = 1'b0;
+    err_beat_fwd        = 1'b0;
+    err_beat_fifo_empty = 1'b1;
+    err_beat_slot0      = 32'h0;
+    gnt_blocked_cycles  = 0;
     rst = 1'b1;
     repeat (5) @(posedge clk);
     rst = 1'b0;
@@ -1858,12 +1885,105 @@ module ibex_wb_host_adapter_tb;
     end
   endtask
 
+  // E5: ERR mid-burst while the preload buffer is popped and refilled on the
+  //     same edge, with the FIFO head consumed as lookahead (fifo_forward).
+  //
+  // E2/E4 error a burst that is draining a queue nobody is refilling.  This one
+  // keeps the Ibex side pushing for the whole test, so the FIFO stays full, the
+  // burst runs at one beat per cycle, and on every beat the preload buffer pops
+  // slot0 and reads the FIFO on the SAME edge -- the fifo_forward path, in which
+  // fifo_dout is consumed as the third-word lookahead (burst_valid_qq).
+  //
+  // The question this settles: at the error edge slot0 STILL HOLDS the address
+  // that is erroring on the bus, so retiring it requires a preload-buffer pop.
+  // The error path never issues one.  It works because the pop was already
+  // scheduled by the PREVIOUS beat's ACK and lands on this very edge --
+  // `preload_buffer_pop <= 1'b0` at the top of the BURST block cannot cancel it,
+  // since the buffer sampled the pop during the cycle that is now ending.
+  //
+  // That makes correct behaviour here depend on a cross-beat timing relationship
+  // rather than on anything the error handling does, which is exactly the kind
+  // of thing that breaks silently. The white-box checks below (err_beat_pop,
+  // err_beat_fwd) fail if the scenario stops reaching that path, so the test
+  // cannot quietly decay into a duplicate of E2.
+  task test_burst_err_under_backpressure;
+    integer n;
+    begin
+      start_test("E5: ERR mid-burst under back pressure (buffer popped and refilled on one edge)");
+      stop_ack();
+
+      watch_addr = 32'h0000_1008;   // third beat of the run: the one that errors
+
+      fork
+        // Keep requesting for the whole test so the FIFO never drains.
+        begin : drv
+          n = 0;
+          @(negedge clk);
+          req_valid = 1'b1;
+          req_we    = 1'b0;
+          req_be    = 4'hf;
+          req_wdata = 32'h0;
+          while (n < 20) begin
+            req_addr = 32'h0000_1000 + n * 4;
+            @(posedge clk);
+            if (gnt) n = n + 1;
+            @(negedge clk);
+          end
+          req_valid = 1'b0;
+        end
+        // Let the FIFO saturate first, then run the burst and fail beat 3.
+        begin : bus
+          repeat (14) @(posedge clk);
+          set_err_after_beats(2);
+          set_ack_continuous();
+        end
+      join
+
+      wait_responses(20, 400);
+      expect_counts(20, 20);
+
+      // The scenario really was what it claims to be.
+      check(gnt_blocked_cycles > 0,
+            "E5: no back pressure occurred - the FIFO never went full, scenario not reached");
+      check(err_beats_seen == 1, "E5: exactly one ERR must have been taken");
+      check(err_beat_state == DUT_BURST, "E5: the ERR must have been consumed in BURST");
+      check(err_beat_cti == 3'b010, "E5: the errored beat must be a burst beat (CTI=010)");
+      check(err_beat_addr == 32'h0000_1008, "E5: the ERR must belong to the 0x1008 beat");
+      check(err_beat_fifo_empty == 1'b0,
+            "E5: the FIFO must be non-empty at the error - the refill path is the point");
+      check(err_beat_fwd == 1'b1,
+            "E5: fifo_forward must be active at the error (pop + FIFO read on the same edge)");
+
+      // The crux: slot0 still holds the erroring address, and the pop that
+      // retires it is in flight on this edge.
+      check(err_beat_slot0 == 32'h0000_1008,
+            "E5: slot0 should still hold the erroring request at the error edge");
+      check(err_beat_pop == 1'b1,
+            "E5: the pop retiring the errored request must be in flight at the error edge");
+
+      expect_resp_err(2, 1'b1, "E5: wb_err must be forwarded as resp_err on the third response");
+      expect_resp_err(1, 1'b0, "E5: the beat before the error must respond without error");
+      expect_resp_err(3, 1'b0, "E5: the beat after the error must respond without error");
+
+      // No replay, and the queue continues from the request after the errored one.
+      check(watch_addr_beats == 1,
+            "E5: the errored beat 0x1008 was driven on the bus more than once");
+      check(wb_cyc_addr[1] == 32'h0000_100c,
+            "E5: the cycle after the error must resume at 0x100c");
+
+      repeat (8) @(posedge clk);
+      check(resp_valid == 1'b0, "E5: phantom resp_valid after the run drains");
+      check(!wb_cyc, "E5: WB cycle must close after the run drains");
+      expect_counts(20, 20);
+    end
+  endtask
+
   // ---------------------------------------------------------------------------
   // Top-level
   // ---------------------------------------------------------------------------
   // +testcase=<tag> selects a single test; omitting the plusarg runs all.
   // Tags: C1 C2 C3 C4 C4r C5 C6 supp C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 L1 GAP P6 C17 C18
-  //       E1 E2 E3 E4 (Wishbone bus errors)
+  //       E1 E2 E3 E4 E5 (Wishbone bus errors)
   // The same plusarg names the VCD file when +vcd is also given (vlog_tb_utils).
   initial begin
     errors  = 0;
@@ -1899,6 +2019,7 @@ module ibex_wb_host_adapter_tb;
     if (testcase_filter == "" || testcase_filter == "E2")   test_burst_err_aborts_and_continues();
     if (testcase_filter == "" || testcase_filter == "E3")   test_burst_finish_err_and_continues();
     if (testcase_filter == "" || testcase_filter == "E4")   test_burst_first_beat_err();
+    if (testcase_filter == "" || testcase_filter == "E5")   test_burst_err_under_backpressure();
 
     if (errors == 0)
       $display("\nPASS: all ibex_wb_host_adapter tests passed");
