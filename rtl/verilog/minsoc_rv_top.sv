@@ -222,12 +222,6 @@ module minsoc_rv_top #(
     ndmreset_q <= ndmreset_req;
   end
 
-// Workaround: OpenOCD reads from 0xfffffffc and times out, 
-// With this it errors properly and connection persists
-wire wb_dbgm_req = wb_m2s_dbgm_cyc & wb_m2s_dbgm_stb;
-wire wb_dbgm_xfer = wb_dbgm_req & ~wb_s2m_dbgm_ack;
-
-wire openocd_err = wb_dbgm_xfer & (wb_m2s_dbgs_adr > 32'h3000_0000);
 
   minsoc_riscv_dbg #(
       .NrHarts      (1),
@@ -265,7 +259,7 @@ wire openocd_err = wb_dbgm_xfer & (wb_m2s_dbgs_adr > 32'h3000_0000);
       .master_wb_dat_w_o(wb_m2s_dbgm_dat),
       .master_wb_ack_i(wb_s2m_dbgm_ack),
       .master_wb_dat_r_i(wb_s2m_dbgm_dat),
-      .master_wb_err_i(openocd_err),
+      .master_wb_err_i(wb_s2m_dbgm_err),
       .master_wb_sel_o(wb_m2s_dbgm_sel),
       .master_wb_cti_o(wb_m2s_dbgm_cti),
       .master_wb_bte_o(wb_m2s_dbgm_bte),
