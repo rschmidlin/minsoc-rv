@@ -36,6 +36,7 @@ module ibex_wb_host_adapter_tb;
 
   wire        resp_valid;
   wire [31:0] resp_rdata;
+  wire        resp_err;
 
   wire        wb_cyc;
   wire        wb_stb;
@@ -44,6 +45,7 @@ module ibex_wb_host_adapter_tb;
   wire [31:0] wb_dat_w;
   reg  [31:0] wb_dat_r;
   reg         wb_ack;
+  reg         wb_err = 1'b0;
   wire [3:0]  wb_sel;
   wire [2:0]  wb_cti;
   wire [1:0]  wb_bte;
@@ -59,12 +61,14 @@ module ibex_wb_host_adapter_tb;
     .gnt      (gnt),
     .resp_valid(resp_valid),
     .resp_rdata(resp_rdata),
+    .resp_err (resp_err),
     .wb_cyc   (wb_cyc),
     .wb_stb   (wb_stb),
     .wb_we    (wb_we),
     .wb_adr   (wb_adr),
     .wb_dat_w (wb_dat_w),
     .wb_ack   (wb_ack),
+    .wb_err   (wb_err),
     .wb_dat_r (wb_dat_r),
     .wb_sel   (wb_sel),
     .wb_cti   (wb_cti),
