@@ -66,6 +66,7 @@ module minsoc_riscv_dbg #(
   wire                  master_gnt;
   wire                  master_resp_valid;
   wire           [31:0] master_resp_rdata;
+  wire                  master_resp_err;
   wire                  master_rerror;
 
   // Slave backend adapter signals
@@ -186,7 +187,10 @@ module minsoc_riscv_dbg #(
       .tdo_oe_o()
   );
 
-  assign master_rerror = master_wb_err_i;
+  // The response-valid/error pair must come from the same place (the host
+  // adapter's FSM) so that dm_sba samples them in the same cycle: it only
+  // looks at master_r_err_i when master_r_valid_i is high.
+  assign master_rerror = master_resp_err;
 
   /*
  * Host Wishbone backend adapter
@@ -203,6 +207,7 @@ module minsoc_riscv_dbg #(
       .gnt(master_gnt),
       .resp_valid(master_resp_valid),
       .resp_rdata(master_resp_rdata),
+      .resp_err(master_resp_err),
 
       .wb_cyc(master_wb_cyc_o),
       .wb_stb(master_wb_stb_o),
@@ -210,6 +215,7 @@ module minsoc_riscv_dbg #(
       .wb_adr(master_wb_adr_o),
       .wb_dat_w(master_wb_dat_w_o),
       .wb_ack(master_wb_ack_i),
+      .wb_err(master_wb_err_i),
       .wb_dat_r(master_wb_dat_r_i),
       .wb_sel(master_wb_sel_o),
       .wb_cti(master_wb_cti_o),

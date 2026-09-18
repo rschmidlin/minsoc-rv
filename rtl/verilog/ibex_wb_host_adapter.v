@@ -20,6 +20,7 @@ module ibex_wb_host_adapter #(
     // Response
     output reg        resp_valid,
     output reg [31:0] resp_rdata,
+    output reg        resp_err,
 
     // Wishbone B4
     output reg         wb_cyc,
@@ -28,6 +29,7 @@ module ibex_wb_host_adapter #(
     output reg  [31:0] wb_adr,
     output reg  [31:0] wb_dat_w,
     input  wire        wb_ack,
+    input  wire        wb_err,
     input  wire [31:0] wb_dat_r,
     output reg  [ 3:0] wb_sel,
     output reg  [ 2:0] wb_cti,
@@ -149,6 +151,7 @@ module ibex_wb_host_adapter #(
 
       resp_rdata <= 32'h0000_0000;
       resp_valid <= 1'b0;
+      resp_err   <= 1'b0;
 
       preload_buffer_pop <= 1'b0;
     end else begin
@@ -166,6 +169,7 @@ module ibex_wb_host_adapter #(
           preload_buffer_pop <= 1'b0;
 
           resp_valid <= 1'b0;
+          resp_err   <= 1'b0;
 
           if (slot0_valid && !preload_buffer_pop) begin
             wb_state <= PREPARE1;
@@ -189,9 +193,10 @@ module ibex_wb_host_adapter #(
           wb_stb <= 1'b1;
 
           preload_buffer_pop <= 1'b0;
-          if (wb_ack) begin
+          if (wb_ack || wb_err) begin
             resp_rdata <= wb_dat_r;
             resp_valid <= 1'b1;
+            resp_err   <= wb_err;
 
             wb_cyc <= 1'b0;
             wb_stb <= 1'b0;
@@ -201,6 +206,7 @@ module ibex_wb_host_adapter #(
         end
         BURST: begin
           resp_valid <= 1'b0;
+          resp_err   <= 1'b0;
 
           wb_cyc <= 1'b1;
           wb_stb <= 1'b1;
@@ -210,7 +216,20 @@ module ibex_wb_host_adapter #(
 
           preload_buffer_pop <= 1'b0;
 
-          if (wb_ack) begin
+          if (wb_err) begin
+            // Bus error mid-burst: abort the whole burst immediately, the
+            // remaining beats can't be delivered.
+            resp_rdata <= wb_dat_r;
+            resp_valid <= 1'b1;
+            resp_err   <= 1'b1;
+
+            wb_cyc <= 1'b0;
+            wb_stb <= 1'b0;
+            wb_cti <= 3'b000;
+            wb_bte <= 2'b00;
+
+            wb_state <= IDLE;
+          end else if (wb_ack) begin
             wb_adr <= wb_adr + 'd4;
             resp_rdata <= wb_dat_r;
             // resp_valid signals whether we got an ack previosly and consequently have popped the buffer
@@ -224,9 +243,9 @@ module ibex_wb_host_adapter #(
             // this condition, fifo_dout is not considered part of the visible request
             // window and must not influence CTI/burst-end decisions.
             if ((!slot1_valid)
-           || (!slot2_valid && fifo_empty) 
+           || (!slot2_valid && fifo_empty)
            || (slot1_valid && !burst_valid)
-           || (slot2_valid && !burst_valid_q) 
+           || (slot2_valid && !burst_valid_q)
            || (fifo_forward && !burst_valid_qq)) begin
               wb_cti <= 3'b111;
               preload_buffer_pop <= 1'b1;
@@ -237,11 +256,13 @@ module ibex_wb_host_adapter #(
         end
         FINISH: begin
           resp_valid <= 1'b0;
+          resp_err   <= 1'b0;
 
           preload_buffer_pop <= 1'b0;
 
-          if (wb_ack) begin
+          if (wb_ack || wb_err) begin
             resp_valid <= 1'b1;
+            resp_err   <= wb_err;
 
             resp_rdata <= wb_dat_r;
             wb_adr <= 32'h0000_0000;
@@ -265,6 +286,7 @@ module ibex_wb_host_adapter #(
           wb_bte <= 2'b00;
           preload_buffer_pop <= 1'b0;
           resp_valid <= 1'b0;
+          resp_err <= 1'b0;
           wb_state <= IDLE;
         end
       endcase
