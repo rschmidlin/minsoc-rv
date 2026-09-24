@@ -10,7 +10,7 @@ extern struct argp verilator_tb_utils_argp;
 
 class VerilatorTbUtils {
 public:
-  VerilatorTbUtils(uint32_t *mem);
+  VerilatorTbUtils(uint32_t *mem, uint32_t memBase = 0, size_t memWords = 0);
   ~VerilatorTbUtils();
 
   VerilatedVcdC* tfp;
@@ -51,6 +51,8 @@ private:
   int jtagPort;
 
   uint32_t *mem;
+  uint32_t memBase;  /* bus address of mem[0] */
+  size_t memWords;   /* 0 = unchecked */
 
   bool loadElf(char *fileName);
   bool loadBin(char *fileName);

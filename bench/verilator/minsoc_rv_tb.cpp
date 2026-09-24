@@ -27,6 +27,9 @@ static bool done;
 
 #define RESET_TIME		10
 
+// Bus address of the RAM, must match the mem offset in minsoc-rv.core
+#define MEM_BASE		0xA0000000UL
+
 vluint64_t main_time = 0;       // Current simulation time
 // This is a 64-bit integer to reduce wrap over issues and
 // allow modulus.  You can also use a double, if you wish.
@@ -234,8 +237,9 @@ int main(int argc, char **argv, char **env)
 	Verilated::commandArgs(argc, argv);
 
 	Vminsoc_rv_top* top = new Vminsoc_rv_top;
+	auto& mem = top->minsoc_rv_top->wb_ram_i->ram0->mem;
 	VerilatorTbUtils* tbUtils =
-		new VerilatorTbUtils(top->minsoc_rv_top->wb_ram_i->ram0->mem.data());
+		new VerilatorTbUtils(mem.data(), MEM_BASE, sizeof(mem) / sizeof(mem[0]));
 
 	parse_args(argc, argv, tbUtils);
 	tbUtils->parsePlusArgs();

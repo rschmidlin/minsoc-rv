@@ -3,14 +3,17 @@
 #include <stdint.h>
 #include <string.h>
 #include <argp.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <gelf.h>
 #include <elf-loader.h>
 #include "verilator_tb_utils.h"
 #include "jtagServer.h"
 
 #define VCD_DEFAULT_NAME "../sim.vcd"
 
-VerilatorTbUtils::VerilatorTbUtils(uint32_t *mem)
-  : mem(mem), t(0), timeout(0), vcdDump(false), vcdDumpStart(0), vcdDumpStop(0),
+VerilatorTbUtils::VerilatorTbUtils(uint32_t *mem, uint32_t memBase, size_t memWords)
+  : mem(mem), memBase(memBase), memWords(memWords), t(0), timeout(0), vcdDump(false), vcdDumpStart(0), vcdDumpStop(0),
     vcdFileName((char *)VCD_DEFAULT_NAME), vcdDumping(false), jtagEnable(false),
     lastClk(0), jtagPort(5555) {
   tfp = new VerilatedVcdC;
@@ -69,23 +72,74 @@ bool VerilatorTbUtils::clkPosEdge(uint8_t clk) {
   return isEdge;
 }
 
+/* Load the PT_LOAD segments of an ELF file into mem. Segment addresses are
+ * bus addresses and are translated relative to memBase, so the RAM does not
+ * have to be mapped at address 0. */
 bool VerilatorTbUtils::loadElf(char *fileName) {
-  uint8_t *bin_data;
-  int size;
-
   printf("Loading %s\n", fileName);
-  bin_data = load_elf_file(fileName, &size);
-  if (bin_data == NULL) {
-    printf("Error loading elf file\n");
+
+  if (elf_version(EV_CURRENT) == EV_NONE)
+    return false;
+
+  int fd = open(fileName, O_RDONLY, 0);
+  if (fd < 0) {
+    printf("Can't open %s\n", fileName);
     return false;
   }
 
-  for (int i = 0; i < size; i += 4)
-    this->mem[i/4] = read_32(bin_data, i);
+  Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
+  size_t phdrNum;
+  bool ok = elf && elf_kind(elf) == ELF_K_ELF && !elf_getphdrnum(elf, &phdrNum);
+  if (!ok)
+    printf("Error loading elf file\n");
 
-  free(bin_data);
+  for (size_t i = 0; ok && i < phdrNum; i++) {
+    GElf_Phdr phdr;
+    if (gelf_getphdr(elf, i, &phdr) != &phdr) {
+      ok = false;
+      break;
+    }
+    if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
+      continue;
 
-  return true;
+    printf("Program header %lu: addr 0x%08X, size 0x%08X\n", i,
+           (unsigned int)phdr.p_paddr, (unsigned int)phdr.p_filesz);
+
+    uint64_t end = phdr.p_paddr + phdr.p_memsz;
+    if (phdr.p_paddr < memBase || (phdr.p_paddr & 3) ||
+        (memWords && end > memBase + (uint64_t)memWords * 4)) {
+      printf("Segment 0x%08X-0x%08X outside memory 0x%08X-0x%08X\n",
+             (unsigned int)phdr.p_paddr, (unsigned int)end, memBase,
+             (unsigned int)(memBase + memWords * 4));
+      ok = false;
+      break;
+    }
+
+    /* Copy file contents, zero-fill the rest (.bss) */
+    uint8_t *seg = (uint8_t *)calloc(1, (phdr.p_memsz + 3) & ~3ULL);
+    if (phdr.p_filesz) {
+      Elf_Data *data = elf_getdata_rawchunk(elf, phdr.p_offset, phdr.p_filesz, ELF_T_BYTE);
+      if (data == NULL) {
+        printf("Couldn't load program data chunk\n");
+        free(seg);
+        ok = false;
+        break;
+      }
+      memcpy(seg, data->d_buf, data->d_size);
+    }
+
+    uint32_t *dst = this->mem + (phdr.p_paddr - memBase) / 4;
+    for (uint64_t off = 0; off < phdr.p_memsz; off += 4)
+      dst[off / 4] = seg[off] | (seg[off + 1] << 8) | (seg[off + 2] << 16) |
+                     ((uint32_t)seg[off + 3] << 24);  /* RISC-V: little endian */
+    free(seg);
+  }
+
+  if (elf)
+    elf_end(elf);
+  close(fd);
+
+  return ok;
 }
 
 bool VerilatorTbUtils::loadBin(char *fileName) {
