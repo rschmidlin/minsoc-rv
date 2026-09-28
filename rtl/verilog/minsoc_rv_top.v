@@ -24,9 +24,8 @@ localparam wb_dw = 32;
 wire wb_clk = wb_clk_i;
 wire wb_rst = wb_rst_i;
 
-`include "wb_intercon.vh"
+//`include "wb_intercon.vh"
 
-/*
 wire [31:0] wb_m2s_picorv32_adr;
 wire [31:0] wb_m2s_picorv32_dat;
 wire  [3:0] wb_m2s_picorv32_sel;
@@ -35,37 +34,36 @@ wire        wb_m2s_picorv32_cyc;
 wire        wb_m2s_picorv32_stb;
 wire  [2:0] wb_m2s_picorv32_cti;
 wire  [1:0] wb_m2s_picorv32_bte;
-wire [31:0] wb_s2m_picorv32_dat;
-wire        wb_s2m_picorv32_ack;
-wire        wb_s2m_picorv32_err;
-wire        wb_s2m_picorv32_rty;
+reg [31:0] wb_s2m_picorv32_dat;
+reg        wb_s2m_picorv32_ack;
+reg        wb_s2m_picorv32_err;
+reg        wb_s2m_picorv32_rty;
 
-wire [31:0] wb_m2s_mem_adr;
-wire [31:0] wb_m2s_mem_dat;
-wire  [3:0] wb_m2s_mem_sel;
-wire        wb_m2s_mem_we;
-wire        wb_m2s_mem_cyc;
-wire        wb_m2s_mem_stb;
-wire  [2:0] wb_m2s_mem_cti;
-wire  [1:0] wb_m2s_mem_bte;
+reg [31:0] wb_m2s_mem_adr;
+reg [31:0] wb_m2s_mem_dat;
+reg  [3:0] wb_m2s_mem_sel;
+reg        wb_m2s_mem_we;
+reg        wb_m2s_mem_cyc;
+reg        wb_m2s_mem_stb;
+reg  [2:0] wb_m2s_mem_cti;
+reg  [1:0] wb_m2s_mem_bte;
 wire [31:0] wb_s2m_mem_dat;
 wire        wb_s2m_mem_ack;
 wire        wb_s2m_mem_err;
 wire        wb_s2m_mem_rty;
 
-wire [31:0] wb_m2s_uart_adr;
-wire [31:0] wb_m2s_uart_dat;
-wire  [3:0] wb_m2s_uart_sel;
-wire        wb_m2s_uart_we;
-wire        wb_m2s_uart_cyc;
-wire        wb_m2s_uart_stb;
-wire  [2:0] wb_m2s_uart_cti;
-wire  [1:0] wb_m2s_uart_bte;
+reg [31:0] wb_m2s_uart_adr;
+reg [31:0] wb_m2s_uart_dat;
+reg  [3:0] wb_m2s_uart_sel;
+reg        wb_m2s_uart_we;
+reg        wb_m2s_uart_cyc;
+reg        wb_m2s_uart_stb;
+reg  [2:0] wb_m2s_uart_cti;
+reg  [1:0] wb_m2s_uart_bte;
 wire [31:0] wb_s2m_uart_dat;
 wire        wb_s2m_uart_ack;
 wire        wb_s2m_uart_err;
 wire        wb_s2m_uart_rty;
-*/
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -223,6 +221,83 @@ picorv32_wb #(
    
 	.mem_instr()
 );
+
+always @(*) begin
+	if (wb_m2s_picorv32_adr < 32'h0000_FFFF) begin
+		wb_s2m_picorv32_dat = wb_s2m_mem_dat;
+		wb_s2m_picorv32_ack = wb_s2m_mem_ack;
+		wb_s2m_picorv32_err = wb_s2m_mem_err;
+		wb_s2m_picorv32_rty = wb_s2m_mem_rty;
+
+		wb_m2s_mem_adr =  wb_m2s_picorv32_adr;
+		wb_m2s_mem_dat = wb_m2s_picorv32_dat;
+		wb_m2s_mem_sel = wb_m2s_picorv32_sel;
+		wb_m2s_mem_we = wb_m2s_picorv32_we;
+		wb_m2s_mem_cyc = wb_m2s_picorv32_cyc;
+		wb_m2s_mem_stb = wb_m2s_picorv32_stb;
+		wb_m2s_mem_cti = wb_m2s_picorv32_cti;
+		wb_m2s_mem_bte = wb_m2s_picorv32_bte;
+		/*
+		wb_m2s_uart_adr = 32'h0000_0000;
+		wb_m2s_uart_dat = 32'h0000_0000;
+		wb_m2s_uart_sel = 4'h0;
+		wb_m2s_uart_we = 1'b0;
+		wb_m2s_uart_cyc = 1'b0;
+		wb_m2s_uart_stb = 1'b0;
+		wb_m2s_uart_cti = 3'b000;
+		wb_m2s_uart_bte = 2'b00;
+		*/
+	end
+	else if ((wb_m2s_picorv32_adr >= 32'h9000_0020)
+			|| (wb_m2s_picorv32_adr < 32'h9000_0020)) begin
+		wb_s2m_picorv32_dat = wb_s2m_uart_dat;
+		wb_s2m_picorv32_ack = wb_s2m_uart_ack;
+		wb_s2m_picorv32_err = wb_s2m_uart_err;
+		wb_s2m_picorv32_rty = wb_s2m_uart_rty;
+		/*
+		wb_m2s_mem_adr =  32'h0000_0000;
+		wb_m2s_mem_dat = 32'h0000_0000;
+		wb_m2s_mem_sel = 4'h0;
+		wb_m2s_mem_we = 1'b0;
+		wb_m2s_mem_cyc = 1'b0;
+		wb_m2s_mem_stb = 1'b0;
+		wb_m2s_mem_cti = 3'b000;
+		wb_m2s_mem_bte = 2'b00;
+		*/
+		wb_m2s_uart_adr = wb_m2s_picorv32_adr;
+		wb_m2s_uart_dat = wb_m2s_picorv32_dat;
+		wb_m2s_uart_sel = wb_m2s_picorv32_sel;
+		wb_m2s_uart_we = wb_m2s_picorv32_we;
+		wb_m2s_uart_cyc = wb_m2s_picorv32_cyc;
+		wb_m2s_uart_stb = wb_m2s_picorv32_stb;
+		wb_m2s_uart_cti = wb_m2s_picorv32_cti;
+		wb_m2s_uart_bte = wb_m2s_picorv32_bte;
+	end
+	else begin
+		wb_s2m_picorv32_dat = 32'h0000_0000;
+		wb_s2m_picorv32_ack = 1'b0;
+		wb_s2m_picorv32_err = 1'b1;
+		wb_s2m_picorv32_rty = 1'b0;
+
+		wb_m2s_mem_adr = 32'h0000_0000;
+		wb_m2s_mem_dat = 32'h0000_0000;
+		wb_m2s_mem_sel = 4'h0;
+		wb_m2s_mem_we = 1'b0;
+		wb_m2s_mem_cyc = 1'b0;
+		wb_m2s_mem_stb = 1'b0;
+		wb_m2s_mem_cti = 3'b000;
+		wb_m2s_mem_bte = 2'b00;
+
+		wb_m2s_uart_adr = 32'h0000_0000;
+		wb_m2s_uart_dat = 32'h0000_0000;
+		wb_m2s_uart_sel = 4'h0;
+		wb_m2s_uart_we = 1'b0;
+		wb_m2s_uart_cyc = 1'b0;
+		wb_m2s_uart_stb = 1'b0;
+		wb_m2s_uart_cti = 3'b000;
+		wb_m2s_uart_bte = 2'b00;
+	end
+end	
 
 // PicoRV32 does not drive Wishbone B3 cycle type signals;
 // tie to classic cycle (cti=000, bte=00) so the interconnect
