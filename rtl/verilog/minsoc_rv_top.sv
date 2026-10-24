@@ -156,12 +156,18 @@ module minsoc_rv_top #(
       .PMPEnable      (1'b0),
       .PMPGranularity (0),
       .PMPNumRegions  (4),
+      .MHPMCounterNum(2),
+      .MHPMCounterWidth(40),
       .DbgTriggerEn   (1'b1),
       .DbgHwBreakNum  (2),
       .DmBaseAddr     (debug_start_address),
       .DmHaltAddr     (debug_start_address + dm::HaltAddress[31:0]),
       .DmExceptionAddr(debug_start_address + dm::ExceptionAddress[31:0]),
-      .ICache         (1)
+      .BranchTargetALU(1'b1),
+      .WritebackStage(1'b1),
+      .ICache(1'b1),
+      .ICacheECC(1'b0),
+      .BranchPredictor(1'b0)
   ) ibex_wb_i (
       .clk_i (wb_clk),
       .rst_ni(rst_core_n),

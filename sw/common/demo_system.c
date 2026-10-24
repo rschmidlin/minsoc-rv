@@ -71,6 +71,28 @@ uint32_t get_mcycle(void) {
 
 void reset_mcycle(void) { __asm__ volatile("csrw mcycle, x0"); }
 
+
+uint32_t get_lsu_stalls(void)
+{
+  uint32_t result;
+  __asm__ volatile("csrr %0, 0xB03;" : "=r"(result));
+  return result;
+}
+
+uint32_t get_fetch_stalls(void)
+{
+  uint32_t result;
+  __asm__ volatile("csrr %0, 0xB04;" : "=r"(result));
+  return result;
+}
+
+uint32_t get_instr_counts(void)
+{
+  uint32_t result;
+  __asm__ volatile("csrr %0, minstret;" : "=r"(result));
+  return result;  
+}
+
 extern uint32_t _vectors_start;
 volatile uint32_t* exc_vectors = &_vectors_start;
 
@@ -109,6 +131,35 @@ void set_global_interrupt_enable(uint32_t enable) {
   } else {
     asm volatile("csrc mstatus, %0\n" : : "r"(1 << 3));
   }
+}
+
+static uint32_t elapsed_cycles, load_store_stalls, fetch_stalls, nr_of_instructions;
+
+void start_perf_trace(void)
+{
+  elapsed_cycles = get_mcycle();
+  load_store_stalls = get_lsu_stalls();
+  fetch_stalls = get_fetch_stalls();
+  nr_of_instructions = get_instr_counts();
+}
+
+void print_perf_trace(void)
+{
+  uint32_t cycle_diff, lsu_stalls_diff, fetch_stalls_diff, nr_of_instr_diff;
+  cycle_diff = get_mcycle() - elapsed_cycles;
+  lsu_stalls_diff = get_lsu_stalls() - load_store_stalls;
+  fetch_stalls_diff = get_fetch_stalls() - fetch_stalls;
+  nr_of_instr_diff = get_instr_counts() - nr_of_instructions;
+  puts("Performance counters:\n");
+  puts("  cycles:  0x");
+  puthex(cycle_diff);
+  puts("\n  LSU stalls:  0x");
+  puthex(lsu_stalls_diff);
+  puts("\n  fetch stalls:  0x");
+  puthex(fetch_stalls_diff);
+  puts("\n  Instructions:  0x");
+  puthex(nr_of_instr_diff);
+  putchar('\n');
 }
 
 void simple_exc_handler(void) {

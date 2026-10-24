@@ -104,4 +104,11 @@ unsigned int get_mtval();
 uint32_t get_mcycle(void);
 void reset_mcycle(void);
 
+uint32_t get_lsu_stalls(void);
+uint32_t get_fetch_stalls(void);
+uint32_t get_instr_counts(void);
+
+void start_perf_trace();
+void print_perf_trace();
+
 #endif

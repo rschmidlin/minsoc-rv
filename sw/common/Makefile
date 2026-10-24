@@ -12,7 +12,7 @@ RANLIB	 = $(CROSS)ranlib
 
 ARCH     = -march=rv32imc_zicsr_zifencei -mabi=ilp32
 
-CFLAGS   = $(ARCH) -mcmodel=medany -Wall -fvisibility=hidden -ffreestanding -O0 -g -Wall -ffreestanding -nostdlib
+CFLAGS   = $(ARCH) -mcmodel=medany -Wall -fvisibility=hidden -ffreestanding -O2 -g -Wall -ffreestanding -nostdlib
 LDFLAGS  = $(ARCH) -T link.ld -nostartfiles -nostdlib -lgcc
 
 TARGET   = libcommon.a

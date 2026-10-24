@@ -66,6 +66,8 @@ zero_loop_end:
 
 
 main_entry:
+  /* enable Ibex instruction cache */
+  csrsi 0x7C0, 1
   /* jump to main program entry point (argc = argv = 0) */
   addi x10, x0, 0
   addi x11, x0, 0
