@@ -98,9 +98,9 @@ void disable_interrupts(uint32_t disable_mask);
  */
 void set_global_interrupt_enable(uint32_t enable);
 
-unsigned int get_mepc();
-unsigned int get_mcause();
-unsigned int get_mtval();
+uint32_t get_mepc(void);
+uint32_t get_mcause(void);
+uint32_t get_mtval(void);
 uint32_t get_mcycle(void);
 void reset_mcycle(void);
 
@@ -108,7 +108,7 @@ uint32_t get_lsu_stalls(void);
 uint32_t get_fetch_stalls(void);
 uint32_t get_instr_counts(void);
 
-void start_perf_trace();
-void print_perf_trace();
+void start_perf_trace(void);
+void print_perf_trace(void);
 
 #endif

@@ -45,19 +45,19 @@ void puthex(uint32_t h) {
   }
 }
 
-unsigned int get_mepc() {
+uint32_t get_mepc(void) {
   uint32_t result;
   __asm__ volatile("csrr %0, mepc;" : "=r"(result));
   return result;
 }
 
-unsigned int get_mcause() {
+uint32_t get_mcause(void) {
   uint32_t result;
   __asm__ volatile("csrr %0, mcause;" : "=r"(result));
   return result;
 }
 
-unsigned int get_mtval() {
+uint32_t get_mtval(void) {
   uint32_t result;
   __asm__ volatile("csrr %0, mtval;" : "=r"(result));
   return result;
