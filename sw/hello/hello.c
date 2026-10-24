@@ -19,7 +19,7 @@ int main(void)
     enable_interrupts(UART_IRQ);
     set_global_interrupt_enable(1);
     unsigned int end = timer_get();
-    uart_print_str("Init time elapsed in clock cycles: ");
+    uart_print_str("Init time elapsed in clock cycles: 0x");
     puthex(end-start);
     putchar('\n');
     uart_print_str("Hello World.\n");
