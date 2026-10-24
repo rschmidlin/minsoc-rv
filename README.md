@@ -16,6 +16,18 @@ MinSoC-RV's ambition is to be seriously considered for embedded systems in the M
 
 Burst access is done via the module ibex_wb_host_adapter. It converts Ibex memory accesses into Wishbone transmissions and issues burst accesses when it detects sequential memory accesses. Its implementation decouples request acceptance from the Wishbone transmission generation and response delivery, while dynamically extending an ongoing burst with newly accepted sequential requests. The design rationale, the variants that were evaluated and the failure cases that shaped the final architecture are documented in [doc/adapter-design.md](doc/adapter-design.md).
 
+## Comparison with other SoC projects
+
+MinSoC-RV takes a slightly different approach from other open-source SoC projects.
+
+While [Ibex Demo System](https://github.com/lowRISC/ibex-demo-system) provides a useful reference platform for Ibex, its interconnect is deliberately simplified. MinSoC-RV uses Wishbone and `wb_intercon` to provide a more flexible foundation for integrating additional peripherals and bus masters.
+
+[PULPissimo](https://github.com/pulp-platform/pulpissimo) provides a more comprehensive microcontroller architecture, including an advanced memory subsystem, DMA capabilities and accelerator interfaces. MinSoC-RV instead favors a smaller and simpler architecture that can be extended incrementally.
+
+Frameworks such as [LiteX](https://github.com/enjoy-digital/litex) offer comprehensive SoC generation capabilities and extensive IP libraries. MinSoC-RV instead aims to keep the hardware architecture small and directly readable in SystemVerilog, while using FuseSoC to manage reusable IP cores, dependencies and build flows.
+
+The objective is to combine simplicity and readability with the ability to incrementally extend the system using existing hardware components.
+
 ## Memory mapping
 
 | Region                         | Address                                  |
