@@ -136,7 +136,7 @@ On another terminal, navigate to `<path>/workspace/minsoc-rv/sw/hello`. Then run
 |  1    | target remote :3333 | Connects to `OpenOCD` |
 | 2    | set $pc=0x80 | Sets the program counter to beginning of the software execution |
 | 3  | load | Loads the program to the memory of `minsoc-rv` |
-| 3   | continue (c)   | Starts the execution |
+| 4   | continue (c)   | Starts the execution |
 
 *notice: see gdb cheat-sheet for how to handle `gdb`.*
 
