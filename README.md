@@ -125,9 +125,9 @@ Now wait until Vivado generates and opens the corresponding project. You can now
 
 BTN0 will reset the design and send `Hello World.` again through `UART` with baudrate 115200. On your computer, you can use `Putty` on Windows to see the message. Select Serial protocol and write COM4 as address (check under Device Manager which COM number is available). Under Linux use `minicom` or `screen` (e.g. screen /dev/ttyUSB1 115200). If you press a key in the terminal of `Putty` or `screen`, RISC-V will return the next letter to you, not the one you pressed. 
 
-### Debugging using OpenOCD
+### Debugging / loading the software using OpenOCD
 
-To debug the firmware, you can connect to the RISC-V debugging unit over `OpenOCD`. For that, Vivado's `Hardware Manager` must be closed, otherwise the JTAG port is blocked. Run openocd with the `boolean.cfg` script under data: `openocd -f <path>/workspace/minsoc-rv/data/boolean.cfg`. You might need admin rights / sudo for that. Leave the terminal executing `OpenOCD` open. 
+To debug the firmware, you can connect to the RISC-V debugging unit over `OpenOCD`. For that, Vivado's `Hardware Manager` must be closed, otherwise the JTAG port is blocked. Run `OpenOCD` with the `boolean.cfg` script under data: `openocd -f <path>/workspace/minsoc-rv/data/boolean.cfg`. You might need admin rights / sudo for that. Leave the terminal executing `OpenOCD` open. 
 
 On another terminal, navigate to `<path>/workspace/minsoc-rv/sw/hello`. Then run the debugger `gdb` on `hello.elf`. Command on Ubuntu: `gdb-multiarch hello.elf`. Inside the `gdb` interactive terminal execute the following commands:
 
@@ -135,6 +135,7 @@ On another terminal, navigate to `<path>/workspace/minsoc-rv/sw/hello`. Then run
 |-------|---------|-------------|
 |  1    | target remote :3333 | Connects to `OpenOCD` |
 | 2    | set $pc=0x80 | Sets the program counter to beginning of the software execution |
+| 3  | load | Loads the program to the memory of `minsoc-rv` |
 | 3   | continue (c)   | Starts the execution |
 
 *notice: see gdb cheat-sheet for how to handle `gdb`.*
