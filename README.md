@@ -94,8 +94,50 @@ cd <path>/workspace
 make -C minsoc-rv/sw/common
 make -C minsoc-rv/sw/hello
 source .venv/bin/activate
-fusesoc run --target sim --elf_load <path>/workspace/minsoc-rv/sw/hello/hello.elf
+fusesoc run --target sim minsoc-rv --elf_load <path>/workspace/minsoc-rv/sw/hello/hello.elf
 ```
+
+## Generating bitfile for Boolean board
+
+The easiest approach is to request fusesoc to generate a Vivado script that will generate a minsoc-rv project. 
+
+```
+cd <path>/workspace
+source .venv/bin/activate
+fusesoc run --setup --target synth minsoc-rv --memfile <path>/workspace/minsoc-rv/sw/hello/hello.bin
+```
+
+*notice: `--memfile <path>/workspace/minsoc-rv/sw/hello/hello.bin` preloads the RAM memory used for the RISC-V software with the `Hello World.` example.*
+
+Then generate the Vivado corresponding project. For that execute the `minsoc-rv_0.1.tcl` script on Vivado. 
+First, open Vivado and change directory in the TCL console to reach `<path>/workspace/build/minsoc-rv_0.1/synth/` and then execute `minsoc-rv_0.1.tcl`. 
+
+```
+cd <path>/workspace/build/minsoc-rv_0.1/synth/
+source minsoc-rv_0.1.tcl
+```
+
+Now wait until Vivado generates and opens the corresponding project. You can now click at `Generate Bitstream`, `Synthesize` or `Implement`. After that, open the `Hardwware Manager` to load the bitfile to your FPGA. 
+
+*notice: don't forget to close the `Hardware Manager` if you want to debug using `OpenOCD`.*
+
+### Interacting with the Software
+
+BTN0 will reset the design and send `Hello World.` again through `UART` with baudrate 115200. On your computer, you can use `Putty` on Windows to see the message. Select Serial protocol and write COM4 as address (check under Device Manager which COM number is available). Under Linux use `minicom` or `screen` (e.g. screen /dev/ttyUSB1 115200). If you press a key in the terminal of `Putty` or `screen`, RISC-V will return the next letter to you, not the one you pressed. 
+
+### Debugging using OpenOCD
+
+To debug the firmware, you can connect to the RISC-V debugging unit over `OpenOCD`. For that, Vivado's `Hardware Manager` must be closed, otherwise the JTAG port is blocked. Run openocd with the `boolean.cfg` script under data: `openocd -f <path>/workspace/minsoc-rv/data/boolean.cfg`. You might need admin rights / sudo for that. Leave the terminal executing `OpenOCD` open. 
+
+On another terminal, navigate to `<path>/workspace/minsoc-rv/sw/hello`. Then run the debugger `gdb` on `hello.elf`. Command on Ubuntu: `gdb-multiarch hello.elf`. Inside the `gdb` interactive terminal execute the following commands:
+
+| Order | Command | Description |
+|-------|---------|-------------|
+|  1    | target remote :3333 | Connects to `OpenOCD` |
+| 2    | set $pc=0x80 | Sets the program counter to beginning of the software execution |
+| 3   | continue (c)   | Starts the execution |
+
+*notice: see gdb cheat-sheet for how to handle `gdb`.*
 
 ## VCD Debugging hints
 
